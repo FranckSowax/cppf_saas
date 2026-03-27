@@ -440,7 +440,7 @@ router.get('/sessions/:id', authenticate, async (req, res) => {
       where: { id: req.params.id },
       include: {
         contact: {
-          select: { id: true, name: true, phone: true, category: true, city: true, accountType: true }
+          select: { id: true, name: true, phone: true, category: true, province: true, regime: true }
         }
       }
     });

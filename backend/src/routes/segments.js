@@ -55,15 +55,21 @@ router.get('/', authenticate, async (req, res) => {
 // ============================================
 router.get('/fields', authenticate, (req, res) => {
   const fields = [
-    { name: 'category', label: 'Catégorie', type: 'select', group: 'PROFIL', options: ['ALL', 'ACTIVE', 'INACTIVE', 'NEW', 'PREMIUM', 'VIP'] },
-    { name: 'city', label: 'Ville', type: 'text', group: 'PROFIL' },
-    { name: 'country', label: 'Pays', type: 'text', group: 'PROFIL' },
-    { name: 'ageRange', label: "Tranche d'âge", type: 'select', group: 'PROFIL', options: ['18-25', '26-35', '36-45', '46-55', '56+'] },
+    { name: 'category', label: 'Catégorie', type: 'select', group: 'PROFIL', options: ['ALL', 'ACTIF', 'RETRAITE', 'AYANT_DROIT', 'INVALIDE'] },
+    { name: 'ville', label: 'Ville', type: 'text', group: 'PROFIL' },
+    { name: 'province', label: 'Province', type: 'text', group: 'PROFIL' },
+    { name: 'matricule', label: 'Matricule', type: 'text', group: 'PROFIL' },
+    { name: 'administration', label: 'Administration', type: 'text', group: 'PROFIL' },
+    { name: 'grade', label: 'Grade', type: 'text', group: 'PROFIL' },
     { name: 'gender', label: 'Genre', type: 'select', group: 'PROFIL', options: ['M', 'F', 'AUTRE'] },
     { name: 'language', label: 'Langue', type: 'select', group: 'PROFIL', options: ['fr', 'en', 'es'] },
-    { name: 'status', label: 'Statut', type: 'select', group: 'PROFIL', options: ['ACTIVE', 'UNSUBSCRIBED', 'BLOCKED'] },
-    { name: 'accountType', label: 'Type de compte', type: 'select', group: 'BANQUE', options: ['EPARGNE', 'COURANT', 'PROFESSIONNEL', 'JEUNE'] },
-    { name: 'registrationDate', label: "Date d'inscription", type: 'date', group: 'BANQUE' },
+    { name: 'status', label: 'Statut', type: 'select', group: 'PROFIL', options: ['ACTIVE', 'UNSUBSCRIBED', 'BLOCKED', 'DECEASED', 'INACTIVE'] },
+    { name: 'regime', label: 'Régime', type: 'select', group: 'CPPF', options: ['GENERAL', 'SPECIAL', 'CONTRACTUEL'] },
+    { name: 'numeroPension', label: 'Numéro de pension', type: 'text', group: 'CPPF' },
+    { name: 'nombreEnfants', label: "Nombre d'enfants", type: 'number', group: 'CPPF' },
+    { name: 'datePriseService', label: 'Date prise de service', type: 'date', group: 'CPPF' },
+    { name: 'dateDepart', label: 'Date de départ', type: 'date', group: 'CPPF' },
+    { name: 'dernierCertificatVie', label: 'Dernier certificat de vie', type: 'date', group: 'CPPF' },
     { name: 'engagementScore', label: "Score d'engagement", type: 'number', group: 'COMPORTEMENT' },
     { name: 'lastActivity', label: 'Dernière activité', type: 'date', group: 'COMPORTEMENT' },
     { name: 'lastCampaignInteraction', label: 'Dernière interaction campagne', type: 'date', group: 'COMPORTEMENT' },
@@ -262,9 +268,9 @@ router.get('/:id/contacts', authenticate, async (req, res) => {
         skip,
         take: parseInt(limit),
         select: {
-          id: true, name: true, phone: true, email: true, city: true,
-          accountType: true, category: true, engagementScore: true,
-          ageRange: true, gender: true, lastActivity: true, tags: true
+          id: true, name: true, phone: true, email: true, province: true,
+          regime: true, category: true, engagementScore: true,
+          administration: true, gender: true, lastActivity: true, tags: true
         }
       }),
       prisma.contact.count({ where })
@@ -295,10 +301,10 @@ router.get('/:id/insights', authenticate, async (req, res) => {
     const criteriaWhere = buildWhereClause(segment.criteria);
     const baseWhere = { AND: [{ status: 'ACTIVE' }, criteriaWhere] };
 
-    const [byCity, byAccountType, byAgeRange, byGender, engagementAvg, total] = await Promise.all([
-      prisma.contact.groupBy({ by: ['city'], where: { ...baseWhere, city: { not: null } }, _count: { city: true }, orderBy: { _count: { city: 'desc' } }, take: 8 }),
-      prisma.contact.groupBy({ by: ['accountType'], where: { ...baseWhere, accountType: { not: null } }, _count: { accountType: true } }),
-      prisma.contact.groupBy({ by: ['ageRange'], where: { ...baseWhere, ageRange: { not: null } }, _count: { ageRange: true } }),
+    const [byProvince, byRegime, byAdministration, byGender, engagementAvg, total] = await Promise.all([
+      prisma.contact.groupBy({ by: ['province'], where: { ...baseWhere, province: { not: null } }, _count: { province: true }, orderBy: { _count: { province: 'desc' } }, take: 8 }),
+      prisma.contact.groupBy({ by: ['regime'], where: { ...baseWhere, regime: { not: null } }, _count: { regime: true } }),
+      prisma.contact.groupBy({ by: ['administration'], where: { ...baseWhere, administration: { not: null } }, _count: { administration: true }, orderBy: { _count: { administration: 'desc' } }, take: 8 }),
       prisma.contact.groupBy({ by: ['gender'], where: { ...baseWhere, gender: { not: null } }, _count: { gender: true } }),
       prisma.contact.aggregate({ _avg: { engagementScore: true }, where: baseWhere }),
       prisma.contact.count({ where: baseWhere })
@@ -307,9 +313,9 @@ router.get('/:id/insights', authenticate, async (req, res) => {
     res.json({
       total,
       averageEngagement: Math.round(engagementAvg._avg.engagementScore || 0),
-      byCity: byCity.map(i => ({ name: i.city, count: i._count.city })),
-      byAccountType: byAccountType.map(i => ({ name: i.accountType, count: i._count.accountType })),
-      byAgeRange: byAgeRange.map(i => ({ name: i.ageRange, count: i._count.ageRange })),
+      byProvince: byProvince.map(i => ({ name: i.province, count: i._count.province })),
+      byRegime: byRegime.map(i => ({ name: i.regime, count: i._count.regime })),
+      byAdministration: byAdministration.map(i => ({ name: i.administration, count: i._count.administration })),
       byGender: byGender.map(i => ({ name: i.gender, count: i._count.gender }))
     });
   } catch (error) {
@@ -430,8 +436,8 @@ router.post('/preview', authenticate, async (req, res) => {
         id: c.id,
         name: c.name,
         phone: c.phone,
-        city: c.city,
-        accountType: c.accountType,
+        province: c.province,
+        regime: c.regime,
         engagementScore: c.engagementScore
       }))
     });
@@ -614,7 +620,7 @@ router.get('/:id/search-contacts', authenticate, async (req, res) => {
       orderBy: { name: 'asc' },
       select: {
         id: true, name: true, phone: true, email: true,
-        city: true, category: true, accountType: true
+        province: true, category: true, regime: true
       }
     });
 

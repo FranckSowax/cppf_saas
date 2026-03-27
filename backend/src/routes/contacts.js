@@ -38,9 +38,9 @@ router.get('/', authenticate, async (req, res) => {
       category,
       status,
       search,
-      city,
-      accountType,
-      ageRange,
+      province,
+      regime,
+      administration,
       sortBy = 'createdAt',
       sortOrder = 'desc'
     } = req.query;
@@ -52,9 +52,9 @@ router.get('/', authenticate, async (req, res) => {
 
     if (category) where.category = category.toUpperCase();
     if (status) where.status = status.toUpperCase();
-    if (city) where.city = { contains: city, mode: 'insensitive' };
-    if (accountType) where.accountType = accountType.toUpperCase();
-    if (ageRange) where.ageRange = ageRange;
+    if (province) where.province = { contains: province, mode: 'insensitive' };
+    if (regime) where.regime = regime.toUpperCase();
+    if (administration) where.administration = { contains: administration, mode: 'insensitive' };
 
     if (search) {
       where.OR = [
@@ -126,8 +126,9 @@ router.get('/:id', authenticate, async (req, res) => {
 router.post('/', authenticate, authorize(['contact:create']), async (req, res) => {
   try {
     const {
-      phone, email, name, category = 'ACTIVE', tags = [],
-      city, country, ageRange, gender, language, accountType, registrationDate
+      phone, email, name, category = 'ACTIF', tags = [],
+      matricule, administration, grade, regime, ville, province, gender, language,
+      dateNaissance, datePriseService, dateDepart, numeroPension, nombreEnfants
     } = req.body;
 
     // Validation
@@ -158,13 +159,19 @@ router.post('/', authenticate, authorize(['contact:create']), async (req, res) =
         name,
         category: category.toUpperCase(),
         tags,
-        city,
-        country,
-        ageRange,
+        matricule,
+        administration,
+        grade,
+        regime,
+        ville,
+        province,
         gender,
         language,
-        accountType,
-        registrationDate: registrationDate ? new Date(registrationDate) : null
+        dateNaissance: dateNaissance ? new Date(dateNaissance) : null,
+        datePriseService: datePriseService ? new Date(datePriseService) : null,
+        dateDepart: dateDepart ? new Date(dateDepart) : null,
+        numeroPension,
+        nombreEnfants: nombreEnfants ? parseInt(nombreEnfants) : null
       }
     });
 
@@ -188,7 +195,8 @@ router.put('/:id', authenticate, authorize(['contact:update']), async (req, res)
     const { id } = req.params;
     const {
       email, name, category, tags, status,
-      city, country, ageRange, gender, language, accountType, registrationDate
+      matricule, administration, grade, regime, ville, province, gender, language,
+      dateNaissance, datePriseService, dateDepart, numeroPension, nombreEnfants
     } = req.body;
 
     const updateData = {};
@@ -197,13 +205,19 @@ router.put('/:id', authenticate, authorize(['contact:update']), async (req, res)
     if (category !== undefined) updateData.category = category.toUpperCase();
     if (tags !== undefined) updateData.tags = tags;
     if (status !== undefined) updateData.status = status.toUpperCase();
-    if (city !== undefined) updateData.city = city;
-    if (country !== undefined) updateData.country = country;
-    if (ageRange !== undefined) updateData.ageRange = ageRange;
+    if (matricule !== undefined) updateData.matricule = matricule;
+    if (administration !== undefined) updateData.administration = administration;
+    if (grade !== undefined) updateData.grade = grade;
+    if (regime !== undefined) updateData.regime = regime;
+    if (ville !== undefined) updateData.ville = ville;
+    if (province !== undefined) updateData.province = province;
     if (gender !== undefined) updateData.gender = gender;
     if (language !== undefined) updateData.language = language;
-    if (accountType !== undefined) updateData.accountType = accountType;
-    if (registrationDate !== undefined) updateData.registrationDate = registrationDate ? new Date(registrationDate) : null;
+    if (dateNaissance !== undefined) updateData.dateNaissance = dateNaissance ? new Date(dateNaissance) : null;
+    if (datePriseService !== undefined) updateData.datePriseService = datePriseService ? new Date(datePriseService) : null;
+    if (dateDepart !== undefined) updateData.dateDepart = dateDepart ? new Date(dateDepart) : null;
+    if (numeroPension !== undefined) updateData.numeroPension = numeroPension;
+    if (nombreEnfants !== undefined) updateData.nombreEnfants = nombreEnfants ? parseInt(nombreEnfants) : null;
 
     const contact = await prisma.contact.update({
       where: { id },
@@ -286,22 +300,28 @@ router.post('/import', authenticate, authorize(['contact:import']), uploadLimite
           update: {
             name: record.name,
             email: record.email,
-            category: record.category?.toUpperCase() || record.segment?.toUpperCase() || 'ACTIVE',
+            category: record.category?.toUpperCase() || record.segment?.toUpperCase() || 'ACTIF',
             tags: record.tags ? record.tags.split(',').map(t => t.trim()) : [],
-            city: record.city || undefined,
-            accountType: record.accountType || undefined,
-            ageRange: record.ageRange || undefined,
+            matricule: record.matricule || undefined,
+            administration: record.administration || undefined,
+            grade: record.grade || undefined,
+            regime: record.regime || undefined,
+            ville: record.ville || undefined,
+            province: record.province || undefined,
             gender: record.gender || undefined
           },
           create: {
             phone: normalizedPhone,
             name: record.name,
             email: record.email,
-            category: record.category?.toUpperCase() || record.segment?.toUpperCase() || 'ACTIVE',
+            category: record.category?.toUpperCase() || record.segment?.toUpperCase() || 'ACTIF',
             tags: record.tags ? record.tags.split(',').map(t => t.trim()) : [],
-            city: record.city || undefined,
-            accountType: record.accountType || undefined,
-            ageRange: record.ageRange || undefined,
+            matricule: record.matricule || undefined,
+            administration: record.administration || undefined,
+            grade: record.grade || undefined,
+            regime: record.regime || undefined,
+            ville: record.ville || undefined,
+            province: record.province || undefined,
             gender: record.gender || undefined
           }
         });
@@ -351,8 +371,10 @@ router.get('/export', authenticate, authorize(['contact:export']), async (req, r
         phone: true,
         email: true,
         category: true,
-        city: true,
-        accountType: true,
+        matricule: true,
+        administration: true,
+        regime: true,
+        province: true,
         tags: true,
         status: true,
         engagementScore: true,
@@ -369,8 +391,10 @@ router.get('/export', authenticate, authorize(['contact:export']), async (req, r
         phone: 'Téléphone',
         email: 'Email',
         category: 'Catégorie',
-        city: 'Ville',
-        accountType: 'Type Compte',
+        matricule: 'Matricule',
+        administration: 'Administration',
+        regime: 'Régime',
+        province: 'Province',
         tags: 'Tags',
         status: 'Statut',
         engagementScore: 'Score Engagement',
@@ -392,7 +416,7 @@ router.get('/export', authenticate, authorize(['contact:export']), async (req, r
 // ============================================
 router.get('/stats/overview', authenticate, async (req, res) => {
   try {
-    const [total, byCategory, byStatus, byCity, byAccountType, recent] = await Promise.all([
+    const [total, byCategory, byStatus, byProvince, byRegime, recent] = await Promise.all([
       prisma.contact.count(),
       prisma.contact.groupBy({
         by: ['category'],
@@ -403,16 +427,16 @@ router.get('/stats/overview', authenticate, async (req, res) => {
         _count: { status: true }
       }),
       prisma.contact.groupBy({
-        by: ['city'],
-        where: { city: { not: null } },
-        _count: { city: true },
-        orderBy: { _count: { city: 'desc' } },
+        by: ['province'],
+        where: { province: { not: null } },
+        _count: { province: true },
+        orderBy: { _count: { province: 'desc' } },
         take: 10
       }),
       prisma.contact.groupBy({
-        by: ['accountType'],
-        where: { accountType: { not: null } },
-        _count: { accountType: true }
+        by: ['regime'],
+        where: { regime: { not: null } },
+        _count: { regime: true }
       }),
       prisma.contact.count({
         where: {
@@ -433,12 +457,12 @@ router.get('/stats/overview', authenticate, async (req, res) => {
         acc[item.status] = item._count.status;
         return acc;
       }, {}),
-      byCity: byCity.reduce((acc, item) => {
-        if (item.city) acc[item.city] = item._count.city;
+      byProvince: byProvince.reduce((acc, item) => {
+        if (item.province) acc[item.province] = item._count.province;
         return acc;
       }, {}),
-      byAccountType: byAccountType.reduce((acc, item) => {
-        if (item.accountType) acc[item.accountType] = item._count.accountType;
+      byRegime: byRegime.reduce((acc, item) => {
+        if (item.regime) acc[item.regime] = item._count.regime;
         return acc;
       }, {}),
       recent

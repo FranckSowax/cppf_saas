@@ -282,20 +282,20 @@ router.get('/contacts', authenticate, async (req, res) => {
       _count: { status: true }
     });
 
-    // Contacts par ville (top 10)
-    const byCity = await prisma.contact.groupBy({
-      by: ['city'],
-      where: { city: { not: null } },
-      _count: { city: true },
-      orderBy: { _count: { city: 'desc' } },
+    // Contacts par province (top 10)
+    const byProvince = await prisma.contact.groupBy({
+      by: ['province'],
+      where: { province: { not: null } },
+      _count: { province: true },
+      orderBy: { _count: { province: 'desc' } },
       take: 10
     });
 
-    // Contacts par type de compte
-    const byAccountType = await prisma.contact.groupBy({
-      by: ['accountType'],
-      where: { accountType: { not: null } },
-      _count: { accountType: true }
+    // Contacts par régime
+    const byRegime = await prisma.contact.groupBy({
+      by: ['regime'],
+      where: { regime: { not: null } },
+      _count: { regime: true }
     });
 
     // Nouveaux contacts par jour (30 derniers jours)
@@ -332,12 +332,12 @@ router.get('/contacts', authenticate, async (req, res) => {
         acc[item.status] = item._count.status;
         return acc;
       }, {}),
-      byCity: byCity.reduce((acc, item) => {
-        if (item.city) acc[item.city] = item._count.city;
+      byProvince: byProvince.reduce((acc, item) => {
+        if (item.province) acc[item.province] = item._count.province;
         return acc;
       }, {}),
-      byAccountType: byAccountType.reduce((acc, item) => {
-        if (item.accountType) acc[item.accountType] = item._count.accountType;
+      byRegime: byRegime.reduce((acc, item) => {
+        if (item.regime) acc[item.regime] = item._count.regime;
         return acc;
       }, {}),
       newContactsDaily: dailyNewContacts,
