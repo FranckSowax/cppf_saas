@@ -1,0 +1,521 @@
+// ============================================
+// CPPF WhatsApp Connect - Database Schema
+// Avec Supabase pgvector pour le RAG
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// User & Authentication
+// ============================================
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(OPERATOR)
+  isActive  Boolean  @default(true)
+  lastLogin DateTime?
+
+  // Relations
+  campaigns Campaign[]
+  apiKeys   ApiKey[]
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ============================================
+// Campaigns
+// ============================================
+model Campaign {
+  id          String          @id @default(uuid())
+  name        String
+  type        CampaignType
+  status      CampaignStatus  @default(DRAFT)
+  description String?
+
+  // Statistics
+  sent        Int             @default(0)
+  delivered   Int             @default(0)
+  read        Int             @default(0)
+  clicked     Int             @default(0)
+  failed      Int             @default(0)
+
+  // Configuration
+  templateId  String
+  template    Template        @relation(fields: [templateId], references: [id])
+  variables   Json?           @default("{}")
+
+  // Segmentation (new dynamic system)
+  segmentId       String?
+  segmentRef      Segment?        @relation("CampaignSegment", fields: [segmentId], references: [id])
+  inlineCriteria  Json?           // Ad-hoc targeting criteria without saved segment
+  legacySegment   ContactCategory? // Legacy: renamed from 'segment'
+
+  // Scheduling
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  // Relations
+  messages    Message[]
+
+  // Timestamps
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  createdBy   String
+  user        User            @relation(fields: [createdBy], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([createdBy])
+  @@index([segmentId])
+  @@map("campaigns")
+}
+
+// ============================================
+// Templates (WhatsApp)
+// ============================================
+model Template {
+  id          String           @id @default(uuid())
+  name        String
+  displayName String
+  category    TemplateCategory
+  content     String
+  variables   String[]         @default([])
+  variableMapping Json?        // {var1: "nom", var2: "matricule"} - default mapping for campaigns
+  language    String           @default("fr")
+
+  // Header (IMAGE, VIDEO, DOCUMENT, TEXT, or NONE)
+  headerType    String?          @default("NONE")
+  headerContent String?          // Image/video URL or text content
+  buttons       Json?            // [{type:"URL",text:"...",url:"..."}, {type:"QUICK_REPLY",text:"..."}]
+  footer        String?
+
+  // Meta approval status
+  status      TemplateStatus   @default(PENDING)
+  metaId      String?          // WhatsApp template ID from Meta
+  approvedAt  DateTime?
+  rejectedAt  DateTime?
+  rejectionReason String?
+
+  // Relations
+  campaigns   Campaign[]
+
+  // Timestamps
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@map("templates")
+}
+
+// ============================================
+// Contacts (Assures CPPF)
+// ============================================
+model Contact {
+  id            String          @id @default(uuid())
+  phone         String          @unique
+  email         String?
+  name          String?
+
+  // Categorie d'assure
+  category      ContactCategory @default(ACTIF)
+  tags          String[]        @default([])
+
+  // Champs specifiques CPPF
+  matricule     String?         @unique // Numero matricule agent (ex: "123456A")
+  administration String?        // Ministere ou institution (ex: "Min. Education", "Forces Armees")
+  grade         String?         // Grade/corps de l'agent (ex: "Attache d'administration")
+  regime        String?         @default("GENERAL") // GENERAL ou SPECIAL
+  dateNaissance DateTime?
+  datePriseService DateTime?    // Date d'entree dans la fonction publique
+  dateDepart    DateTime?       // Date de depart a la retraite (si retraite)
+  numeroPension String?         // Numero de pension (retraites uniquement)
+  ville         String?         // Ville de residence (ex: "Libreville", "Franceville")
+  province      String?         // Province (ex: "Estuaire", "Haut-Ogooue")
+  prestations   Json?           @default("[]") // Liste des prestations actives
+  nombreEnfants Int?            @default(0)
+  dernierCertificatVie DateTime? // Date du dernier certificat de vie
+
+  // Genre et langue
+  gender        String?         // "M", "F"
+  language      String?         @default("fr")
+
+  // Enrichment & scoring
+  customAttributes  Json?       @default("{}")
+  engagementScore   Int?        @default(0)
+  lastCampaignInteraction DateTime?
+
+  // Metadata
+  lastActivity  DateTime?
+  status        ContactStatus   @default(ACTIVE)
+
+  // WhatsApp specific
+  whatsappId    String?         // WhatsApp Business API contact ID
+  optedIn       Boolean         @default(false)
+  optedInAt     DateTime?
+
+  // Relations
+  messages      Message[]
+  chatSessions  ChatSession[]
+
+  // Timestamps
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([category])
+  @@index([status])
+  @@index([phone])
+  @@index([matricule])
+  @@index([administration])
+  @@index([regime])
+  @@index([province])
+  @@index([ville])
+  @@map("contacts")
+}
+
+// ============================================
+// Segments (Dynamic targeting)
+// ============================================
+model Segment {
+  id              String      @id @default(uuid())
+  name            String      @unique
+  description     String?
+  type            SegmentType @default(DYNAMIC)
+  criteria        Json        // JSON rules engine criteria
+  contactCount    Int         @default(0)
+  lastEvaluatedAt DateTime?
+
+  // Relations
+  campaigns       Campaign[]  @relation("CampaignSegment")
+
+  createdBy       String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@map("segments")
+}
+
+// ============================================
+// Enrichment Logs (audit trail)
+// ============================================
+model EnrichmentLog {
+  id          String   @id @default(uuid())
+  contactId   String
+  source      String   // "MANUAL", "CSV_IMPORT", "CPPF_SYSTEM"
+  fieldName   String
+  oldValue    String?
+  newValue    String?
+  performedBy String?
+  createdAt   DateTime @default(now())
+
+  @@index([contactId])
+  @@map("enrichment_logs")
+}
+
+// ============================================
+// Messages
+// ============================================
+model Message {
+  id          String        @id @default(uuid())
+
+  // Relations
+  campaignId  String?
+  campaign    Campaign?     @relation(fields: [campaignId], references: [id])
+  contactId   String
+  contact     Contact       @relation(fields: [contactId], references: [id])
+
+  // Content
+  content     String
+  type        MessageType   @default(TEXT)
+
+  // Status tracking
+  status      MessageStatus @default(PENDING)
+  externalId  String?       // WhatsApp message ID (wamid)
+  trackingId  String?       @unique // UUID for click tracking redirect
+
+  // Timestamps
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  clickedAt      DateTime?
+  clickedButtons Json?       // [{index: 0, clickedAt: "..."}, ...]
+  failedAt       DateTime?
+  error          String?
+
+  createdAt   DateTime      @default(now())
+
+  @@index([campaignId])
+  @@index([contactId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+// ============================================
+// Knowledge Documents (RAG avec Supabase)
+// ============================================
+model KnowledgeDocument {
+  id          String         @id @default(uuid())
+  name        String
+  type        String         // pdf, docx, xlsx, etc.
+  size        Int            // in bytes
+  path        String?        // storage path (optionnel avec Supabase)
+
+  // Indexing status
+  status      DocumentStatus @default(PROCESSING)
+  chunks      Int            @default(0)
+  indexedAt   DateTime?
+
+  // Relations
+  chunks_data KnowledgeChunk[]
+
+  // Timestamps
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status])
+  @@map("knowledge_documents")
+}
+
+// ============================================
+// Knowledge Chunks (pour pgvector)
+// ============================================
+model KnowledgeChunk {
+  id           String   @id @default(uuid())
+  documentId   String
+  document     KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // Content
+  content      String
+
+  // Vector embedding (3072 dimensions pour text-embedding-3-large)
+  embedding    Unsupported("vector(3072)")?
+
+  // Metadata
+  metadata     Json     @default("{}")
+
+  // Timestamps
+  createdAt    DateTime @default(now())
+
+  @@index([documentId])
+  @@map("knowledge_chunks")
+}
+
+// ============================================
+// API Keys
+// ============================================
+model ApiKey {
+  id          String    @id @default(uuid())
+  name        String
+  key         String    @unique
+
+  // Permissions
+  permissions String[]  @default([])
+
+  // Usage tracking
+  lastUsedAt  DateTime?
+  usageCount  Int       @default(0)
+
+  // Status
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+
+  // Relations
+  createdBy   String
+  user        User      @relation(fields: [createdBy], references: [id])
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+
+  @@index([key])
+  @@map("api_keys")
+}
+
+// ============================================
+// Chat Sessions (RAG)
+// ============================================
+model ChatSession {
+  id          String    @id @default(uuid())
+  contactId   String?
+  contact     Contact?  @relation(fields: [contactId], references: [id])
+
+  // Messages
+  messages    Json[]    @default([])
+
+  // Metadata
+  source      String    @default("web") // web, whatsapp, api
+  userAgent   String?
+  ipAddress   String?
+
+  // === Enrichissement IA CPPF ===
+  enriched          Boolean   @default(false)
+  intentCategory    String?   // PENSION_INQUIRY, PRESTATION_FAMILIALE, CERTIFICAT_VIE, LIQUIDATION, COTISATION, DOSSIER_SUIVI, RECLAMATION, INFO_GENERALE, REVERSION, E_CPPF
+  serviceMentioned  String?   // PENSION_GENERALE, PENSION_SPECIALE, PENSION_REVERSION, ALLOCATION_FAMILIALE, ALLOCATION_SCOLAIRE, RENTE_INVALIDITE, E_CPPF, NONE
+  sentiment         String?   // POSITIVE, NEUTRAL, NEGATIVE, FRUSTRATED
+  urgencyLevel      String?   // LOW, MEDIUM, HIGH, CRITICAL
+  resolutionStatus  String?   // RESOLVED, UNRESOLVED, ESCALATION_NEEDED, FOLLOW_UP_REQUIRED
+  satisfactionScore Float?    // 1.0 - 5.0 (AI-estimated)
+  customerNeedSummary String? // Resume du besoin reel de l'assure
+  actionRequired    Boolean   @default(false)
+  actionDescription String?   // Action humaine necessaire
+  topicTags         String[]  @default([])
+  language          String?   @default("fr")
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([contactId])
+  @@index([createdAt])
+  @@index([intentCategory])
+  @@index([sentiment])
+  @@index([urgencyLevel])
+  @@index([resolutionStatus])
+  @@index([enriched])
+  @@map("chat_sessions")
+}
+
+// ============================================
+// Daily Reports (Rapports quotidiens enrichissement)
+// ============================================
+model DailyReport {
+  id                    String    @id @default(uuid())
+  date                  DateTime  @unique
+
+  // Conversation stats
+  totalConversations    Int       @default(0)
+  whatsappConversations Int       @default(0)
+  webConversations      Int       @default(0)
+
+  // Sentiment breakdown
+  sentimentPositive     Int       @default(0)
+  sentimentNeutral      Int       @default(0)
+  sentimentNegative     Int       @default(0)
+  sentimentFrustrated   Int       @default(0)
+
+  // Intent & service breakdown (JSON for flexibility)
+  intentBreakdown       Json      @default("{}")
+  productBreakdown      Json      @default("{}")
+
+  // Resolution stats
+  resolvedCount         Int       @default(0)
+  unresolvedCount       Int       @default(0)
+  escalationCount       Int       @default(0)
+  followUpCount         Int       @default(0)
+
+  // Satisfaction
+  avgSatisfactionScore  Float?
+
+  // AI-generated insights
+  topCustomerNeeds      String[]  @default([])
+  keyInsights           String?
+  recommendations       String?
+
+  // Metadata
+  generatedAt           DateTime  @default(now())
+
+  @@index([date])
+  @@map("daily_reports")
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum Role {
+  ADMIN
+  MANAGER
+  OPERATOR
+}
+
+enum CampaignType {
+  INFORMATION
+  PRESTATION
+  RAPPEL
+  RETRAITE
+  FAMILIALE
+  INSTITUTIONNEL
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum TemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+}
+
+enum TemplateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ContactCategory {
+  ALL
+  ACTIF
+  RETRAITE
+  AYANT_DROIT
+  INVALIDE
+}
+
+enum SegmentType {
+  STATIC
+  DYNAMIC
+  CPPF_CRITERIA
+}
+
+enum ContactStatus {
+  ACTIVE
+  INACTIVE
+  UNSUBSCRIBED
+  DECEASED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  DOCUMENT
+  TEMPLATE
+  LOCATION
+  BUTTON
+}
+
+enum MessageStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum DocumentStatus {
+  PROCESSING
+  INDEXED
+  FAILED
+}

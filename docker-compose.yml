@@ -1,0 +1,80 @@
+# ============================================
+# CPPF WhatsApp Connect - Deploiement On-Premise
+# Usage: docker compose up -d
+# ============================================
+
+services:
+  # ============================================
+  # Application Node.js (API + Frontend)
+  # ============================================
+  app:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    container_name: cppf-whatsapp-app
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://cppf_user:${DB_PASSWORD}@db:5432/cppf_whatsapp?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - app_logs:/app/logs
+    networks:
+      - cppf-internal
+    restart: unless-stopped
+
+  # ============================================
+  # PostgreSQL avec pgvector (BDD on-premise)
+  # ============================================
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: cppf-whatsapp-db
+    environment:
+      POSTGRES_USER: cppf_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: cppf_whatsapp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - cppf-internal
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cppf_user -d cppf_whatsapp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Nginx Reverse Proxy (SSL + IP filtering)
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    container_name: cppf-whatsapp-nginx
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - cppf-internal
+      - cppf-external
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local
+  app_logs:
+    driver: local
+
+networks:
+  cppf-internal:
+    driver: bridge
+    internal: true    # Pas d'acces Internet direct
+  cppf-external:
+    driver: bridge    # Acces Internet (webhooks + API)

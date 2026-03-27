@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guide - Creer une Campagne WhatsApp | CPPF</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        :root {
+            --primary: #1e3a5f; --primary-dark: #0f1f33; --accent: #10b981; --accent-dark: #059669;
+            --gold: #d4a843; --gold-light: #f5ecd3;
+            --danger: #ef4444; --warning: #f59e0b; --info: #3b82f6;
+            --whatsapp: #25D366; --whatsapp-dark: #128C7E;
+            --g50: #f9fafb; --g100: #f3f4f6; --g200: #e5e7eb; --g300: #d1d5db;
+            --g500: #6b7280; --g700: #374151; --g900: #111827;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; color: var(--g900); line-height: 1.7; background: #fff; }
+        @media print {
+            body { font-size: 10pt; }
+            .cover { min-height: auto; padding: 3rem; }
+            .page-break { page-break-before: always; }
+            h2 { page-break-before: always; }
+            h2:first-of-type { page-break-before: auto; }
+        }
+        @page { margin: 1.8cm; }
+
+        .cover {
+            min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: linear-gradient(160deg, #0f1f33 0%, #1e3a5f 50%, #2a5a8f 100%);
+            color: white; text-align: center; padding: 4rem 2rem; position: relative; overflow: hidden;
+        }
+        .cover::after {
+            content: ''; position: absolute; top: -50%; right: -30%; width: 80%; height: 200%;
+            background: radial-gradient(ellipse, rgba(37,211,102,0.06) 0%, transparent 70%);
+        }
+        .cover-badge { position: relative; z-index: 1; font-size: 0.7rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--whatsapp); margin-bottom: 2rem; font-weight: 600; }
+        .cover h1 { position: relative; z-index: 1; font-size: 2.4rem; font-weight: 900; letter-spacing: -0.03em; margin-bottom: 0.5rem; max-width: 700px; }
+        .cover h1 span { color: var(--whatsapp); }
+        .cover .sub { position: relative; z-index: 1; font-size: 1.05rem; font-weight: 300; opacity: 0.8; margin-bottom: 3rem; max-width: 550px; }
+        .cover-conf { position: relative; z-index: 1; margin-top: 2rem; border: 1px solid rgba(212,168,67,0.3); color: var(--gold); padding: 0.5rem 1.5rem; border-radius: 8px; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; }
+        .cover-footer { position: relative; z-index: 1; display: flex; gap: 2rem; font-size: 0.75rem; opacity: 0.4; margin-top: 2rem; }
+
+        .content { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; }
+        h2 { font-size: 1.4rem; font-weight: 700; color: var(--primary); margin: 3rem 0 1.25rem; padding-bottom: 0.6rem; border-bottom: 3px solid var(--primary); display: flex; align-items: center; gap: 0.6rem; }
+        h2 .step-num { background: var(--primary); color: white; width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
+        h3 { font-size: 1.05rem; font-weight: 600; color: var(--g900); margin: 1.5rem 0 0.6rem; }
+        p { margin-bottom: 0.85rem; color: var(--g700); font-size: 0.9rem; }
+        ol, ul { margin: 0.75rem 0 1rem 1.5rem; color: var(--g700); font-size: 0.9rem; }
+        li { margin-bottom: 0.4rem; }
+        code { background: var(--g100); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.82rem; color: var(--primary); }
+        strong { color: var(--g900); }
+
+        .box { border-radius: 12px; padding: 1.25rem 1.5rem; margin: 1.25rem 0; font-size: 0.88rem; }
+        .box-info { background: #eff6ff; border-left: 4px solid var(--info); }
+        .box-success { background: #f0fdf4; border-left: 4px solid var(--accent); }
+        .box-warning { background: #fffbeb; border-left: 4px solid var(--warning); }
+        .box-danger { background: #fef2f2; border-left: 4px solid var(--danger); }
+        .box-whatsapp { background: #f0fdf9; border-left: 4px solid var(--whatsapp); }
+        .box strong { display: block; margin-bottom: 0.25rem; }
+        .box p { margin-bottom: 0.25rem; }
+
+        .screenshot {
+            border: 2px solid var(--g200); border-radius: 12px; padding: 1rem; margin: 1rem 0;
+            background: var(--g50); text-align: center;
+        }
+        .screenshot .placeholder {
+            background: linear-gradient(135deg, var(--g100), white);
+            border: 2px dashed var(--g300); border-radius: 8px;
+            padding: 2rem; color: var(--g500); font-size: 0.8rem; font-style: italic;
+        }
+
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; }
+        th { background: var(--primary); color: white; padding: 0.6rem 1rem; text-align: left; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--g200); }
+        tr:nth-child(even) td { background: var(--g50); }
+        .text-center { text-align: center; }
+
+        .badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; }
+        .badge-green { background: #dcfce7; color: #166534; }
+        .badge-blue { background: #dbeafe; color: #1e40af; }
+        .badge-amber { background: #fef3c7; color: #92400e; }
+        .badge-red { background: #fef2f2; color: #991b1b; }
+        .badge-whatsapp { background: #dcfce7; color: #128C7E; }
+
+        .flow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin: 1.25rem 0; }
+        .flow-step { background: white; border: 2px solid var(--g200); border-radius: 10px; padding: 0.75rem 1rem; font-size: 0.8rem; font-weight: 600; color: var(--primary); text-align: center; min-width: 120px; }
+        .flow-step.active { border-color: var(--whatsapp); background: #f0fdf4; }
+        .flow-arrow { color: var(--g300); font-size: 1.2rem; }
+
+        .toc { background: var(--g50); border-radius: 16px; padding: 1.75rem; margin: 2rem 0; }
+        .toc h3 { margin-top: 0; }
+        .toc-item { display: flex; justify-content: space-between; padding: 0.45rem 0; border-bottom: 1px dashed var(--g200); font-size: 0.88rem; }
+        .toc-item:last-child { border-bottom: none; }
+        .toc-num { color: var(--primary); font-weight: 700; margin-right: 0.75rem; }
+
+        .shortcut { display: inline-flex; align-items: center; gap: 0.3rem; background: var(--g100); border: 1px solid var(--g200); border-radius: 6px; padding: 0.15rem 0.5rem; font-size: 0.75rem; font-weight: 600; color: var(--g700); }
+
+        .doc-footer { margin-top: 4rem; padding-top: 2rem; border-top: 2px solid var(--g200); text-align: center; color: var(--g500); font-size: 0.78rem; }
+    </style>
+</head>
+<body>
+
+<!-- ============================== COUVERTURE ============================== -->
+<div class="cover">
+    <div class="cover-badge">CPPF &bull; Plateforme WhatsApp Business</div>
+    <h1>Guide de Creation d'une<br><span>Campagne WhatsApp</span></h1>
+    <p class="sub">Procedure pas-a-pas pour creer, configurer et lancer une campagne marketing ou utilitaire sur la plateforme CPPF WhatsApp Connect.</p>
+    <div class="cover-conf">Document interne - Guide utilisateur</div>
+    <div class="cover-footer">
+        <span>Fevrier 2026</span>
+        <span>Version 1.0</span>
+    </div>
+</div>
+
+<!-- ============================== CONTENU ============================== -->
+<div class="content">
+
+    <div class="toc">
+        <h3>Sommaire</h3>
+        <div class="toc-item"><span><span class="toc-num">1.</span> Vue d'ensemble du processus</span></div>
+        <div class="toc-item"><span><span class="toc-num">2.</span> Creer un template de message</span></div>
+        <div class="toc-item"><span><span class="toc-num">3.</span> Attendre l'approbation Meta</span></div>
+        <div class="toc-item"><span><span class="toc-num">4.</span> Creer la campagne</span></div>
+        <div class="toc-item"><span><span class="toc-num">5.</span> Definir le ciblage</span></div>
+        <div class="toc-item"><span><span class="toc-num">6.</span> Selectionner le template et configurer</span></div>
+        <div class="toc-item"><span><span class="toc-num">7.</span> Planifier ou lancer</span></div>
+        <div class="toc-item"><span><span class="toc-num">8.</span> Suivi et statistiques</span></div>
+        <div class="toc-item"><span><span class="toc-num">9.</span> Bonnes pratiques et conseils</span></div>
+    </div>
+
+    <!-- ==================== ETAPE 1 ==================== -->
+    <h2><span class="step-num">1</span> Vue d'ensemble du processus</h2>
+
+    <p>La creation d'une campagne WhatsApp se fait en <strong>deux phases principales</strong> : la creation du template de message (soumis a Meta pour approbation), puis la creation et le lancement de la campagne elle-meme.</p>
+
+    <div class="flow">
+        <div class="flow-step">Template</div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-step">Approbation Meta</div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-step">Campagne</div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-step">Ciblage</div>
+        <div class="flow-arrow">&#8594;</div>
+        <div class="flow-step active">Lancement</div>
+    </div>
+
+    <div class="box box-info">
+        <strong>Pourquoi un template ?</strong>
+        <p>Meta (WhatsApp) exige que tous les messages envoyes en premier (hors conversation active) utilisent un <strong>template pre-approuve</strong>. Cette verification garantit la qualite et le respect des regles anti-spam. Delai d'approbation : <strong>24 a 48 heures</strong>.</p>
+    </div>
+
+    <!-- ==================== ETAPE 2 ==================== -->
+    <h2><span class="step-num">2</span> Creer un template de message</h2>
+
+    <p>Depuis le menu lateral, cliquez sur <strong>Templates</strong> puis sur le bouton <strong>+ Nouveau template</strong>.</p>
+
+    <h3>2.1 Informations de base</h3>
+    <table>
+        <thead>
+            <tr><th>Champ</th><th>Description</th><th>Exemple</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><strong>Nom technique</strong></td><td>Identifiant unique, sans espaces ni accents (lettres, chiffres, underscores)</td><td><code>cppf_info_pension_2026</code></td></tr>
+            <tr><td><strong>Nom d'affichage</strong></td><td>Nom visible dans la plateforme</td><td><code>Promotion Noel 2026</code></td></tr>
+            <tr><td><strong>Categorie</strong></td><td>Type de message (affecte la tarification)</td><td><span class="badge badge-blue">Marketing</span> / <span class="badge badge-amber">Utilitaire</span></td></tr>
+        </tbody>
+    </table>
+
+    <div class="box box-warning">
+        <strong>Categories et tarification</strong>
+        <p><span class="badge badge-blue">Marketing</span> = 35 FCFA/msg (promotions, offres, relances)</p>
+        <p><span class="badge badge-amber">Utilitaire</span> = 11 FCFA/msg (confirmations, alertes, notifications)</p>
+        <p>Choisissez la bonne categorie car Meta verifie la coherence du contenu.</p>
+    </div>
+
+    <h3>2.2 En-tete (Header) - Optionnel</h3>
+    <p>L'en-tete apparait en haut du message et enrichit visuellement la communication. Quatre options disponibles :</p>
+    <table>
+        <thead>
+            <tr><th>Type</th><th>Description</th><th>Format</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Aucun</strong></td>
+                <td>Pas d'en-tete, message texte uniquement</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td><strong>Image</strong></td>
+                <td>Photo affichee en haut du message. Ideal pour les visuels de campagne.</td>
+                <td>JPEG ou PNG. Chemin dans <code>/public</code> (ex: <code>templates/promo.jpeg</code>) ou URL publique.</td>
+            </tr>
+            <tr>
+                <td><strong>Video</strong></td>
+                <td>Video avec vignette et bouton play. Ideal pour les reels, temoignages, demos.</td>
+                <td>MP4 uniquement. Chemin dans <code>/public</code> (ex: <code>cppf-dg-message.mp4</code>). Max ~16 MB.</td>
+            </tr>
+            <tr>
+                <td><strong>Texte</strong></td>
+                <td>Ligne de texte en gras en haut du message</td>
+                <td>Texte court (60 caracteres max)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="box box-whatsapp">
+        <strong>Astuce : Video a partir d'un reel Facebook</strong>
+        <p>Pour utiliser un reel Facebook comme en-tete video :</p>
+        <p>1. Telecharger la video du reel (format MP4)</p>
+        <p>2. Placer le fichier dans le dossier <code>/public</code> du projet</p>
+        <p>3. Renseigner le nom du fichier dans le champ (ex: <code>cppf-dg-message.mp4</code>)</p>
+        <p>4. La video sera uploadee automatiquement vers Meta lors de la creation du template</p>
+    </div>
+
+    <h3>2.3 Corps du message (Body)</h3>
+    <p>Le texte principal du message. Vous pouvez utiliser des <strong>variables</strong> pour personnaliser le message :</p>
+    <ul>
+        <li><code>{{1}}</code> = Variable 1 (souvent le prenom ou nom du client)</li>
+        <li><code>{{2}}</code> = Variable 2 (information specifique : montant, date, etc.)</li>
+    </ul>
+    <div class="box box-success">
+        <strong>Exemple de message avec variable</strong>
+        <p>Bonjour <code>{{1}}</code>, CPPF a le plaisir de vous informer de notre nouvelle offre de pension de retraite. Connectez-vous sur e-CPPF pour suivre votre dossier.</p>
+    </div>
+
+    <h3>2.4 Pied de page (Footer) - Optionnel</h3>
+    <p>Texte discret en bas du message. Utilise generalement pour les mentions legales :</p>
+    <p><em>Exemple : "CPPF Gabon | Envoyez STOP pour vous desinscrire"</em></p>
+
+    <h3>2.5 Boutons (Buttons) - Optionnel</h3>
+    <p>Jusqu'a <strong>3 boutons</strong> peuvent etre ajoutes sous le message. Types disponibles :</p>
+    <table>
+        <thead>
+            <tr><th>Type</th><th>Description</th><th>Exemple</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><span class="badge badge-blue">Lien URL</span></td><td>Ouvre un lien web au clic</td><td>Texte: "Acceder a e-CPPF" / URL: <code>https://cppf.ga/</code></td></tr>
+            <tr><td><span class="badge badge-green">Telephone</span></td><td>Lance un appel telephonique</td><td>Texte: "Appeler" / Numero: <code>+24107488716</code></td></tr>
+            <tr><td><span class="badge badge-amber">Reponse rapide</span></td><td>Envoie un message predefined au clic</td><td>Texte: "En savoir plus"</td></tr>
+        </tbody>
+    </table>
+
+    <p>Cliquez sur <strong>+ Ajouter un bouton</strong> pour chaque bouton souhaite, puis remplissez les champs correspondants.</p>
+
+    <h3>2.6 Soumettre le template</h3>
+    <p>Une fois tous les champs remplis, cliquez sur <strong>Creer le template</strong>. Le template est :</p>
+    <ol>
+        <li>Sauvegarde dans la base de donnees locale</li>
+        <li>Soumis automatiquement a Meta WhatsApp pour approbation</li>
+        <li>Affiche avec le statut <span class="badge badge-amber">En attente</span></li>
+    </ol>
+
+    <!-- ==================== ETAPE 3 ==================== -->
+    <h2><span class="step-num">3</span> Attendre l'approbation Meta</h2>
+
+    <p>Apres soumission, Meta examine votre template. Le delai est generalement de <strong>24 a 48 heures</strong>.</p>
+
+    <table>
+        <thead>
+            <tr><th>Statut</th><th>Signification</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-amber">PENDING</span></td>
+                <td>En cours de verification par Meta</td>
+                <td>Patienter. Vous pouvez cliquer sur "Synchroniser" pour verifier.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-green">APPROVED</span></td>
+                <td>Template approuve et pret a l'emploi</td>
+                <td>Vous pouvez creer une campagne avec ce template.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-red">REJECTED</span></td>
+                <td>Template refuse par Meta</td>
+                <td>Verifier le motif de rejet, corriger et creer un nouveau template.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="box box-info">
+        <strong>Synchronisation des statuts</strong>
+        <p>Pour mettre a jour le statut d'un template, cliquez sur l'icone de synchronisation a cote du template, ou utilisez le bouton <strong>Synchroniser tout</strong> en haut de la page Templates pour mettre a jour tous les statuts en une fois.</p>
+    </div>
+
+    <div class="box box-danger">
+        <strong>Raisons frequentes de rejet</strong>
+        <p>- Contenu promotionnel dans un template marque "Utilitaire"</p>
+        <p>- Manque de possibilite de desabonnement (ajoutez STOP dans le footer)</p>
+        <p>- Contenu trompeur ou non conforme aux politiques Meta</p>
+        <p>- URL raccourcie ou suspecte dans les boutons</p>
+    </div>
+
+    <!-- ==================== ETAPE 4 ==================== -->
+    <h2><span class="step-num">4</span> Creer la campagne</h2>
+
+    <p>Une fois le template approuve, allez dans <strong>Campagnes</strong> puis cliquez sur <strong>+ Nouvelle campagne</strong>.</p>
+
+    <h3>4.1 Nom et type de campagne</h3>
+    <table>
+        <thead>
+            <tr><th>Champ</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><strong>Nom de la campagne</strong></td><td>Nom descriptif pour identifier la campagne (ex: "Promo Noel 2026 - Broadcast")</td></tr>
+            <tr><td><strong>Type</strong></td><td><span class="badge badge-blue">Marketing</span> pour les promotions, <span class="badge badge-amber">Notification</span> pour les alertes, <span class="badge badge-green">Relance</span> pour la reactivation</td></tr>
+        </tbody>
+    </table>
+
+    <p>Cliquez sur <strong>Suivant</strong> pour passer a l'etape de ciblage.</p>
+
+    <!-- ==================== ETAPE 5 ==================== -->
+    <h2><span class="step-num">5</span> Definir le ciblage</h2>
+
+    <p>Choisissez a qui envoyer la campagne. Trois options de ciblage disponibles :</p>
+
+    <table>
+        <thead>
+            <tr><th>Option</th><th>Description</th><th>Cas d'usage</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Tous les contacts</strong></td>
+                <td>Envoi a l'ensemble de la base de contacts actifs</td>
+                <td>Broadcast general, annonces importantes</td>
+            </tr>
+            <tr>
+                <td><strong>Segment</strong></td>
+                <td>Envoi a un segment pre-defini</td>
+                <td>Campagnes ciblees (ex: "Clients Libreville", "Comptes Epargne")</td>
+            </tr>
+            <tr>
+                <td><strong>Criteres avances</strong></td>
+                <td>Combinaison de filtres : ville, type de compte, age, engagement, etc.</td>
+                <td>Ciblage sur-mesure sans creer de segment permanent</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="box box-success">
+        <strong>Recommandation : privilegiez les segments</strong>
+        <p>Les campagnes ciblees via des segments ont de meilleurs taux d'engagement et coutent moins cher. Utilisez la segmentation IA ou les criteres bancaires pour cibler les clients pertinents.</p>
+    </div>
+
+    <!-- ==================== ETAPE 6 ==================== -->
+    <h2><span class="step-num">6</span> Selectionner le template et configurer</h2>
+
+    <h3>6.1 Choix du template</h3>
+    <p>Selectionnez un template approuve dans la liste deroulante. Seuls les templates avec le statut <span class="badge badge-green">APPROVED</span> sont disponibles. Un apercu du message s'affiche a droite.</p>
+
+    <h3>6.2 Variables (si applicable)</h3>
+    <p>Si votre template contient des variables (<code>{{1}}</code>, <code>{{2}}</code>, etc.), mappez-les avec les champs contact :</p>
+    <table>
+        <thead>
+            <tr><th>Variable</th><th>Champ contact</th><th>Exemple de valeur</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>{{1}}</code></td><td>Nom du contact</td><td>"Jean Dupont"</td></tr>
+            <tr><td><code>{{2}}</code></td><td>Information personnalisee</td><td>"votre nouveau pret immobilier"</td></tr>
+        </tbody>
+    </table>
+
+    <h3>6.3 Image / Video d'en-tete</h3>
+    <p>Si le template selectionne a un en-tete <strong>Image</strong> ou <strong>Video</strong>, l'image/video definie lors de la creation du template sera utilisee automatiquement. L'upload vers WhatsApp se fait une seule fois, puis le meme media est reutilise pour tous les destinataires.</p>
+
+    <!-- ==================== ETAPE 7 ==================== -->
+    <h2><span class="step-num">7</span> Planifier ou lancer</h2>
+
+    <p>Deux options pour l'envoi :</p>
+
+    <table>
+        <thead>
+            <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Envoi immediat</strong></td>
+                <td>La campagne demarre des la confirmation. Les messages sont envoyes par lots progressifs.</td>
+            </tr>
+            <tr>
+                <td><strong>Planifier</strong></td>
+                <td>Choisissez une date et une heure. La campagne se lancera automatiquement au moment programme.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>7.1 Confirmation et lancement</h3>
+    <p>Un ecran recapitulatif affiche :</p>
+    <ul>
+        <li>Le nom de la campagne et le type</li>
+        <li>Le nombre de destinataires cibles</li>
+        <li>Le template selectionne avec apercu</li>
+        <li>Le mode d'envoi (immediat ou planifie)</li>
+    </ul>
+    <p>Verifiez toutes les informations puis cliquez sur <strong>Lancer la campagne</strong>.</p>
+
+    <div class="box box-warning">
+        <strong>Attention : action irreversible</strong>
+        <p>Une fois lancee, la campagne ne peut pas etre annulee pour les messages deja envoyes. Les messages sont envoyes par lots, vous pouvez mettre en pause la campagne si necessaire.</p>
+    </div>
+
+    <!-- ==================== ETAPE 8 ==================== -->
+    <h2><span class="step-num">8</span> Suivi et statistiques</h2>
+
+    <p>Apres le lancement, suivez les performances en temps reel depuis la page <strong>Campagnes</strong>.</p>
+
+    <table>
+        <thead>
+            <tr><th>Indicateur</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><strong>Envoyes</strong></td><td>Nombre de messages transmis a l'API WhatsApp</td></tr>
+            <tr><td><strong>Delivres</strong></td><td>Messages effectivement recus sur le telephone du destinataire</td></tr>
+            <tr><td><strong>Lus</strong></td><td>Messages ouverts par le destinataire (coche bleue)</td></tr>
+            <tr><td><strong>Cliques</strong></td><td>Clics sur les boutons CTA (lien URL)</td></tr>
+            <tr><td><strong>Echoues</strong></td><td>Messages non delivres (numero invalide, WhatsApp non installe, etc.)</td></tr>
+        </tbody>
+    </table>
+
+    <div class="box box-whatsapp">
+        <strong>Statuts de la campagne</strong>
+        <p><span class="badge badge-amber">DRAFT</span> Brouillon, pas encore lance</p>
+        <p><span class="badge badge-blue">SCHEDULED</span> Planifie pour un envoi futur</p>
+        <p><span class="badge badge-green">RUNNING</span> En cours d'envoi</p>
+        <p><span class="badge badge-green">COMPLETED</span> Envoi termine</p>
+    </div>
+
+    <!-- ==================== ETAPE 9 ==================== -->
+    <h2><span class="step-num">9</span> Bonnes pratiques et conseils</h2>
+
+    <h3>9.1 Contenu du message</h3>
+    <ul>
+        <li>Gardez les messages <strong>courts et directs</strong> (2-3 phrases max pour le body)</li>
+        <li>Utilisez les <strong>variables</strong> pour personnaliser (le prenom augmente l'engagement)</li>
+        <li>Ajoutez toujours <strong>"Envoyez STOP pour vous desinscrire"</strong> dans le footer</li>
+        <li>Un <strong>seul appel a l'action</strong> clair par message (1 bouton CTA principal)</li>
+    </ul>
+
+    <h3>9.2 Ciblage et frequence</h3>
+    <ul>
+        <li><strong>Segmentez</strong> votre audience plutot que d'envoyer a toute la base</li>
+        <li>Limitez a <strong>1 campagne marketing par semaine</strong> maximum par contact</li>
+        <li>Les <strong>messages utilitaires</strong> (confirmations, alertes) peuvent etre plus frequents</li>
+        <li>Testez d'abord sur un <strong>petit segment</strong> avant un envoi massif</li>
+    </ul>
+
+    <h3>9.3 Timing</h3>
+    <ul>
+        <li>Meilleurs horaires d'envoi : <strong>9h-11h</strong> et <strong>14h-16h</strong> en semaine</li>
+        <li>Evitez les envois le <strong>dimanche</strong> et les <strong>jours feries</strong></li>
+        <li>Planifiez les campagnes a l'avance pour les lancer au bon moment</li>
+    </ul>
+
+    <h3>9.4 Media (Image / Video)</h3>
+    <ul>
+        <li>Les <strong>images</strong> augmentent le taux d'engagement de 20 a 30%</li>
+        <li>Les <strong>videos</strong> sont ideales pour les messages institutionnels, temoignages et demos</li>
+        <li>Format video : <strong>MP4</strong>, taille max recommandee : <strong>16 MB</strong></li>
+        <li>Format image : <strong>JPEG ou PNG</strong>, resolution minimum recommandee : <strong>720x720px</strong></li>
+    </ul>
+
+    <h3>9.5 Gestion des segments</h3>
+    <ul>
+        <li>Vous pouvez <strong>ajouter des contacts</strong> a un segment via le bouton "Ajouter" dans le detail du segment</li>
+        <li>Vous pouvez <strong>retirer un contact</strong> d'un segment en cliquant sur l'icone poubelle a cote du contact</li>
+        <li>Les segments <strong>dynamiques</strong> se mettent a jour automatiquement selon les criteres definis</li>
+        <li>L'ajout manuel de contacts convertit un segment dynamique en segment <strong>statique</strong></li>
+    </ul>
+
+    <div class="box box-success">
+        <strong>Checklist avant lancement</strong>
+        <p>1. Le template est bien <span class="badge badge-green">APPROVED</span></p>
+        <p>2. Le ciblage est correct (verifier le nombre de destinataires)</p>
+        <p>3. Les variables sont bien mappees (tester l'apercu)</p>
+        <p>4. Le footer contient la mention de desabonnement</p>
+        <p>5. L'image ou video d'en-tete est correcte</p>
+        <p>6. L'horaire d'envoi est optimal</p>
+    </div>
+
+    <!-- Footer -->
+    <div class="doc-footer">
+        <p><strong>CPPF</strong> - Plateforme WhatsApp Business Intelligence</p>
+        <p>Guide utilisateur - Fevrier 2026</p>
+    </div>
+
+</div>
+
+</body>
+</html>
