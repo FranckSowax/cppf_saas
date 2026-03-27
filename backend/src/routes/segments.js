@@ -63,7 +63,7 @@ router.get('/fields', authenticate, (req, res) => {
     { name: 'grade', label: 'Grade', type: 'text', group: 'PROFIL' },
     { name: 'gender', label: 'Genre', type: 'select', group: 'PROFIL', options: ['M', 'F', 'AUTRE'] },
     { name: 'language', label: 'Langue', type: 'select', group: 'PROFIL', options: ['fr', 'en', 'es'] },
-    { name: 'status', label: 'Statut', type: 'select', group: 'PROFIL', options: ['ACTIVE', 'UNSUBSCRIBED', 'BLOCKED', 'DECEASED', 'INACTIVE'] },
+    { name: 'status', label: 'Statut', type: 'select', group: 'PROFIL', options: ['ACTIVE', 'INACTIVE', 'UNSUBSCRIBED', 'DECEASED'] },
     { name: 'regime', label: 'Régime', type: 'select', group: 'CPPF', options: ['GENERAL', 'SPECIAL', 'CONTRACTUEL'] },
     { name: 'numeroPension', label: 'Numéro de pension', type: 'text', group: 'CPPF' },
     { name: 'nombreEnfants', label: "Nombre d'enfants", type: 'number', group: 'CPPF' },

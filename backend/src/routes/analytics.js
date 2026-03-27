@@ -119,8 +119,9 @@ router.get('/dashboard', authenticate, async (req, res) => {
       contacts: {
         total: contactStats._count.id,
         active: await prisma.contact.count({ where: { status: 'ACTIVE' } }),
-        blocked: await prisma.contact.count({ where: { status: 'BLOCKED' } }),
-        unsubscribed: await prisma.contact.count({ where: { status: 'UNSUBSCRIBED' } })
+        inactive: await prisma.contact.count({ where: { status: 'INACTIVE' } }),
+        unsubscribed: await prisma.contact.count({ where: { status: 'UNSUBSCRIBED' } }),
+        deceased: await prisma.contact.count({ where: { status: 'DECEASED' } })
       },
       templates: {
         total: await prisma.template.count(),
