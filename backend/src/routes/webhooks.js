@@ -285,4 +285,23 @@ router.get('/health', (req, res) => {
   });
 });
 
+// ============================================
+// POST /webhooks/whatsapp/test-send - Envoyer un message test
+// ============================================
+router.post('/whatsapp/test-send', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Token requis' });
+
+    const { phone, message } = req.body;
+    if (!phone || !message) return res.status(400).json({ error: 'phone et message requis' });
+
+    const result = await whatsappService.sendMessage(phone, message);
+    res.json(result);
+  } catch (error) {
+    logger.error('Test send error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
