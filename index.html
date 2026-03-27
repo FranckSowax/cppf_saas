@@ -276,12 +276,28 @@
         // =============================================
         const CPPFWhatsAppSaaS = () => {
             const [user, setUser] = useState(authStore.getUser());
-            const [activeTab, setActiveTab] = useState('dashboard');
+            const getTabFromPath = () => {
+                const path = window.location.pathname.replace(/^\/+/, '') || 'dashboard';
+                const valid = ['dashboard','campaigns','segments','chatbot','conversations','contacts','templates','analytics','settings'];
+                return valid.includes(path) ? path : 'dashboard';
+            };
+            const [activeTab, setActiveTabState] = useState(getTabFromPath());
             const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
+
+            const setActiveTab = (tab) => {
+                setActiveTabState(tab);
+                window.history.pushState(null, '', '/' + tab);
+            };
+
+            useEffect(() => {
+                const onPopState = () => setActiveTabState(getTabFromPath());
+                window.addEventListener('popstate', onPopState);
+                return () => window.removeEventListener('popstate', onPopState);
+            }, []);
 
             if (!user) return <LoginPage onLogin={setUser} />;
 
-            const handleLogout = () => { authStore.clear(); setUser(null); };
+            const handleLogout = () => { authStore.clear(); setUser(null); window.history.pushState(null, '', '/'); };
 
             const menuItems = [
                 { id: 'dashboard', label: 'Tableau de bord', icon: Icons.LayoutDashboard },
