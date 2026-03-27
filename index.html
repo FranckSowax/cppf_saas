@@ -3118,7 +3118,8 @@
         // =============================================
         const TemplatesView = () => {
             const [showCreateModal, setShowCreateModal] = useState(false);
-            const { data, loading, error, refetch } = useApi('/templates?limit=100');
+            const { data: rawData, loading, error, refetch } = useApi('/templates?limit=100');
+            const data = rawData ? { ...rawData, data: (rawData.data || []).map(t => ({ ...t, buttons: Array.isArray(t.buttons) ? t.buttons : [], variables: Array.isArray(t.variables) ? t.variables : [] })) } : rawData;
             const [form, setForm] = useState({ name: '', displayName: '', category: '', content: '', language: 'fr', headerType: 'NONE', headerContent: '', buttons: [], footer: '', variables: {} });
             const [creating, setCreating] = useState(false);
             const [uploading, setUploading] = useState(false);
