@@ -304,4 +304,23 @@ router.post('/whatsapp/test-send', async (req, res) => {
   }
 });
 
+// ============================================
+// POST /webhooks/whatsapp/test-template - Envoyer un template test
+// ============================================
+router.post('/whatsapp/test-template', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Token requis' });
+
+    const { phone, templateName, language = 'fr', components = [] } = req.body;
+    if (!phone || !templateName) return res.status(400).json({ error: 'phone et templateName requis' });
+
+    const result = await whatsappService.sendTemplate(phone, templateName, language, components);
+    res.json(result);
+  } catch (error) {
+    logger.error('Test template send error', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
