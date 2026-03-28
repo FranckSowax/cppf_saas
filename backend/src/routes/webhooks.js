@@ -323,4 +323,65 @@ router.post('/whatsapp/test-template', async (req, res) => {
   }
 });
 
+// ============================================
+// GET /webhooks/whatsapp/debug-meta - Debug Meta API: templates, phone, account
+// ============================================
+router.get('/whatsapp/debug-meta', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Token requis' });
+
+    const axios = require('axios');
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+    const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const debug = {};
+
+    // 1. Phone number info (quality, status, verified_name)
+    try {
+      const phoneRes = await axios.get(`https://graph.facebook.com/v21.0/${phoneId}`, {
+        params: { fields: 'verified_name,quality_rating,display_phone_number,status,name_status,messaging_limit_tier,throughput,is_official_business_account' },
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      debug.phoneNumber = phoneRes.data;
+    } catch (e) {
+      debug.phoneNumber = { error: e.response?.data?.error?.message || e.message };
+    }
+
+    // 2. WABA info
+    try {
+      const wabaRes = await axios.get(`https://graph.facebook.com/v21.0/${wabaId}`, {
+        params: { fields: 'name,account_review_status,message_template_namespace,on_behalf_of_business_info' },
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      debug.waba = wabaRes.data;
+    } catch (e) {
+      debug.waba = { error: e.response?.data?.error?.message || e.message };
+    }
+
+    // 3. Templates with full details
+    try {
+      const tplRes = await axios.get(`https://graph.facebook.com/v21.0/${wabaId}/message_templates`, {
+        params: { limit: 20, fields: 'name,status,quality_score,category,language,components,rejected_reason' },
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      debug.templates = tplRes.data.data.map(t => ({
+        name: t.name,
+        status: t.status,
+        quality_score: t.quality_score,
+        category: t.category,
+        language: t.language,
+        rejected_reason: t.rejected_reason,
+        components: t.components
+      }));
+    } catch (e) {
+      debug.templates = { error: e.response?.data?.error?.message || e.message };
+    }
+
+    res.json(debug);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
