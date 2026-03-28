@@ -705,6 +705,88 @@ router.post('/sync-all', authenticate, async (req, res) => {
 });
 
 // ============================================
+// POST /api/templates/submit-pending - Soumettre les templates PENDING à Meta
+// Utilisé après le seed local pour finaliser la soumission depuis Railway
+// ============================================
+router.post('/submit-pending', authenticate, async (req, res) => {
+  try {
+    const pendingTemplates = await prisma.template.findMany({
+      where: { status: 'PENDING', metaId: null }
+    });
+
+    if (pendingTemplates.length === 0) {
+      return res.json({ success: true, message: 'Aucun template en attente', submitted: 0 });
+    }
+
+    const results = [];
+
+    for (const tpl of pendingTemplates) {
+      // Upload image to Meta if IMAGE header with Supabase URL
+      let headerHandle = null;
+      if (tpl.headerType === 'IMAGE' && tpl.headerContent && tpl.headerContent.startsWith('http')) {
+        const uploadResult = await whatsappService.uploadMediaForTemplate(null, 'image/jpeg', tpl.headerContent);
+        // Fallback: download + upload via helper
+        if (!uploadResult?.success) {
+          const axios = require('axios');
+          const os = require('os');
+          const fs = require('fs');
+          const tempPath = path.join(os.tmpdir(), `cppf_submit_${Date.now()}.jpg`);
+          try {
+            const imgResp = await axios.get(tpl.headerContent, { responseType: 'arraybuffer', timeout: 60000 });
+            fs.writeFileSync(tempPath, imgResp.data);
+            const result2 = await whatsappService.uploadMediaForTemplate(tempPath, 'image/jpeg');
+            if (result2.success) headerHandle = result2.headerHandle;
+          } catch (dlErr) {
+            logger.warn('Failed to download image for submit', { error: dlErr.message });
+          } finally {
+            try { fs.unlinkSync(tempPath); } catch {}
+          }
+        } else {
+          headerHandle = uploadResult.headerHandle;
+        }
+      }
+
+      // Parse buttons - restore original URLs for Meta submission
+      const buttons = Array.isArray(tpl.buttons) ? tpl.buttons : null;
+
+      // Submit to Meta
+      const metaResult = await whatsappService.createTemplate({
+        name: tpl.name,
+        category: tpl.category.toLowerCase(),
+        content: tpl.content,
+        language: tpl.language || 'fr',
+        headerType: tpl.headerType || 'NONE',
+        headerContent: tpl.headerType === 'TEXT' ? tpl.headerContent : null,
+        headerHandle,
+        buttons,
+        footer: tpl.footer || null
+      });
+
+      if (metaResult.success) {
+        await prisma.template.update({
+          where: { id: tpl.id },
+          data: { metaId: metaResult.templateId }
+        });
+        results.push({ name: tpl.name, status: 'submitted', metaId: metaResult.templateId });
+      } else {
+        results.push({ name: tpl.name, status: 'error', error: metaResult.error });
+      }
+
+      // Rate limit pause
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    const submitted = results.filter(r => r.status === 'submitted').length;
+    logger.info('Submit pending templates', { submitted, total: pendingTemplates.length });
+
+    res.json({ success: true, submitted, total: pendingTemplates.length, results });
+  } catch (error) {
+    logger.error('Error submitting pending templates', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
 // GET /api/templates/variables/preview - Prévisualiser les variables
 // ============================================
 router.post('/variables/preview', authenticate, async (req, res) => {
