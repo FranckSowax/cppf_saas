@@ -667,6 +667,22 @@ router.post('/sync-all', authenticate, async (req, res) => {
     const metaTemplates = templatesResult.templates;
     let synced = 0;
     let created = 0;
+    let deleted = 0;
+
+    // Collect Meta template names to detect DB templates no longer on Meta
+    const metaNames = new Set(metaTemplates.map(mt => mt.name));
+
+    // Mark DB templates not found on Meta as DELETED
+    const allDbTemplates = await prisma.template.findMany({ where: { status: { not: 'REJECTED' } } });
+    for (const dbTpl of allDbTemplates) {
+      if (!metaNames.has(dbTpl.name) && dbTpl.status !== 'REJECTED') {
+        await prisma.template.update({
+          where: { id: dbTpl.id },
+          data: { status: 'REJECTED', rejectionReason: 'Supprime de Meta (introuvable lors de la synchronisation)' }
+        });
+        deleted++;
+      }
+    }
 
     for (const mt of metaTemplates) {
       // Extract component info
@@ -703,6 +719,7 @@ router.post('/sync-all', authenticate, async (req, res) => {
           where: { id: existing.id },
           data: {
             status: mt.status.toUpperCase(),
+            category: mt.category || existing.category,
             metaId: mt.id,
             headerType,
             headerContent: syncHeaderContent,
