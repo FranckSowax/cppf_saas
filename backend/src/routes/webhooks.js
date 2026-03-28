@@ -324,6 +324,117 @@ router.post('/whatsapp/test-template', async (req, res) => {
 });
 
 // ============================================
+// POST /webhooks/whatsapp/change-category - Change templates from MARKETING to UTILITY
+// Deletes from Meta, recreates with new category, updates DB
+// ============================================
+router.post('/whatsapp/change-category', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Token requis' });
+
+    const axios = require('axios');
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+
+    const { templateNames, newCategory = 'UTILITY' } = req.body;
+    if (!templateNames || !Array.isArray(templateNames)) {
+      return res.status(400).json({ error: 'templateNames (array) requis' });
+    }
+
+    const results = [];
+
+    for (const name of templateNames) {
+      const tpl = await prisma.template.findFirst({ where: { name } });
+      if (!tpl) {
+        results.push({ name, status: 'error', error: 'Template non trouve en DB' });
+        continue;
+      }
+
+      // Step 1: Delete from Meta
+      try {
+        await axios.delete(
+          `https://graph.facebook.com/v21.0/${wabaId}/message_templates`,
+          { params: { name }, headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        logger.info(`Deleted template "${name}" from Meta for category change`);
+      } catch (delErr) {
+        const msg = delErr.response?.data?.error?.message || delErr.message;
+        logger.info(`Delete "${name}" from Meta: ${msg}`);
+      }
+
+      // Wait for Meta to process
+      await new Promise(r => setTimeout(r, 3000));
+
+      // Step 2: Upload image header if needed
+      let headerHandle = null;
+      if (tpl.headerType === 'IMAGE' && tpl.headerContent && tpl.headerContent.startsWith('http')) {
+        const tempPath = path.join(os.tmpdir(), `cppf_cat_${Date.now()}.jpg`);
+        try {
+          const imgResp = await axios.get(tpl.headerContent, { responseType: 'arraybuffer', timeout: 60000 });
+          fs.writeFileSync(tempPath, imgResp.data);
+          const uploadResult = await whatsappService.uploadMediaForTemplate(tempPath, 'image/jpeg');
+          if (uploadResult.success) {
+            headerHandle = uploadResult.headerHandle;
+          } else {
+            logger.warn(`Header upload failed for "${name}": ${uploadResult.error}`);
+          }
+        } catch (dlErr) {
+          logger.warn(`Image download failed for "${name}": ${dlErr.message}`);
+        } finally {
+          try { fs.unlinkSync(tempPath); } catch {}
+        }
+      }
+
+      // Step 3: Restore original URLs for buttons
+      let metaButtons = null;
+      if (Array.isArray(tpl.buttons)) {
+        metaButtons = tpl.buttons.map(btn => {
+          if (btn.type === 'URL' && btn.redirectUrl) {
+            return { type: btn.type, text: btn.text, url: btn.redirectUrl };
+          }
+          return { type: btn.type, text: btn.text, url: btn.url || null, phone: btn.phone || null };
+        });
+      }
+
+      // Step 4: Recreate on Meta with new category
+      const metaResult = await whatsappService.createTemplate({
+        name: tpl.name,
+        category: newCategory.toLowerCase(),
+        content: tpl.content,
+        language: tpl.language || 'fr',
+        headerType: tpl.headerType || 'NONE',
+        headerContent: tpl.headerType === 'TEXT' ? tpl.headerContent : null,
+        headerHandle,
+        buttons: metaButtons,
+        footer: tpl.footer || null
+      });
+
+      if (metaResult.success) {
+        await prisma.template.update({
+          where: { id: tpl.id },
+          data: { category: newCategory, metaId: metaResult.templateId, status: 'PENDING' }
+        });
+        results.push({ name, status: 'submitted', metaId: metaResult.templateId, category: newCategory });
+      } else {
+        results.push({ name, status: 'error', error: metaResult.error, details: metaResult.details });
+      }
+
+      // Rate limit
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    const submitted = results.filter(r => r.status === 'submitted').length;
+    res.json({ success: true, submitted, total: templateNames.length, results });
+  } catch (error) {
+    logger.error('Error changing template category', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
 // GET /webhooks/whatsapp/debug-meta - Debug Meta API: templates, phone, account
 // ============================================
 router.get('/whatsapp/debug-meta', async (req, res) => {
