@@ -746,8 +746,17 @@ router.post('/submit-pending', authenticate, async (req, res) => {
         }
       }
 
-      // Parse buttons - restore original URLs for Meta submission
-      const buttons = Array.isArray(tpl.buttons) ? tpl.buttons : null;
+      // Restore original URLs for Meta submission (tracking URLs cause "Invalid parameter")
+      let metaButtons = null;
+      if (Array.isArray(tpl.buttons)) {
+        metaButtons = tpl.buttons.map(btn => {
+          if (btn.type === 'URL' && btn.redirectUrl) {
+            // Use the original destination URL for Meta template, not the tracking URL
+            return { ...btn, url: btn.redirectUrl };
+          }
+          return btn;
+        });
+      }
 
       // Submit to Meta
       const metaResult = await whatsappService.createTemplate({
@@ -758,7 +767,7 @@ router.post('/submit-pending', authenticate, async (req, res) => {
         headerType: tpl.headerType || 'NONE',
         headerContent: tpl.headerType === 'TEXT' ? tpl.headerContent : null,
         headerHandle,
-        buttons,
+        buttons: metaButtons,
         footer: tpl.footer || null
       });
 
