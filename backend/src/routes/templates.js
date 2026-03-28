@@ -705,6 +705,118 @@ router.post('/sync-all', authenticate, async (req, res) => {
 });
 
 // ============================================
+// POST /api/templates/delete-and-resubmit - Supprimer de Meta puis re-soumettre
+// ============================================
+router.post('/delete-and-resubmit', authenticate, async (req, res) => {
+  try {
+    const axios = require('axios');
+    const os = require('os');
+    const fs = require('fs');
+    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+
+    if (!wabaId || !token) {
+      return res.status(400).json({ error: 'WHATSAPP_BUSINESS_ACCOUNT_ID ou WHATSAPP_ACCESS_TOKEN manquant' });
+    }
+
+    const pendingTemplates = await prisma.template.findMany({
+      where: { status: 'PENDING', metaId: null }
+    });
+
+    if (pendingTemplates.length === 0) {
+      return res.json({ success: true, message: 'Aucun template en attente', submitted: 0 });
+    }
+
+    const results = [];
+
+    for (const tpl of pendingTemplates) {
+      // Step 1: Delete from Meta if exists
+      try {
+        await axios.delete(
+          `https://graph.facebook.com/v21.0/${wabaId}/message_templates`,
+          {
+            params: { name: tpl.name },
+            headers: { 'Authorization': `Bearer ${token}` }
+          }
+        );
+        logger.info(`Deleted template "${tpl.name}" from Meta`);
+        // Wait after delete for Meta to process
+        await new Promise(r => setTimeout(r, 3000));
+      } catch (delErr) {
+        const msg = delErr.response?.data?.error?.message || delErr.message;
+        logger.info(`Delete "${tpl.name}" from Meta: ${msg}`);
+      }
+
+      // Step 2: Upload image header if needed
+      let headerHandle = null;
+      if (tpl.headerType === 'IMAGE' && tpl.headerContent && tpl.headerContent.startsWith('http')) {
+        const tempPath = path.join(os.tmpdir(), `cppf_submit_${Date.now()}.jpg`);
+        try {
+          const imgResp = await axios.get(tpl.headerContent, { responseType: 'arraybuffer', timeout: 60000 });
+          fs.writeFileSync(tempPath, imgResp.data);
+          const uploadResult = await whatsappService.uploadMediaForTemplate(tempPath, 'image/jpeg');
+          if (uploadResult.success) {
+            headerHandle = uploadResult.headerHandle;
+            logger.info(`Header handle obtained for "${tpl.name}"`);
+          } else {
+            logger.warn(`Header upload failed for "${tpl.name}": ${uploadResult.error}`);
+          }
+        } catch (dlErr) {
+          logger.warn(`Image download failed for "${tpl.name}": ${dlErr.message}`);
+        } finally {
+          try { fs.unlinkSync(tempPath); } catch {}
+        }
+      }
+
+      // Step 3: Restore original URLs for buttons (no tracking for Meta)
+      let metaButtons = null;
+      if (Array.isArray(tpl.buttons)) {
+        metaButtons = tpl.buttons.map(btn => {
+          if (btn.type === 'URL' && btn.redirectUrl) {
+            return { type: btn.type, text: btn.text, url: btn.redirectUrl };
+          }
+          return { type: btn.type, text: btn.text, url: btn.url || null, phone: btn.phone || null };
+        });
+      }
+
+      // Step 4: Submit to Meta
+      const metaResult = await whatsappService.createTemplate({
+        name: tpl.name,
+        category: tpl.category.toLowerCase(),
+        content: tpl.content,
+        language: tpl.language || 'fr',
+        headerType: tpl.headerType || 'NONE',
+        headerContent: tpl.headerType === 'TEXT' ? tpl.headerContent : null,
+        headerHandle,
+        buttons: metaButtons,
+        footer: tpl.footer || null
+      });
+
+      if (metaResult.success) {
+        await prisma.template.update({
+          where: { id: tpl.id },
+          data: { metaId: metaResult.templateId }
+        });
+        results.push({ name: tpl.name, status: 'submitted', metaId: metaResult.templateId });
+      } else {
+        results.push({ name: tpl.name, status: 'error', error: metaResult.error });
+      }
+
+      // Rate limit between templates
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    const submitted = results.filter(r => r.status === 'submitted').length;
+    logger.info('Delete-and-resubmit complete', { submitted, total: pendingTemplates.length });
+
+    res.json({ success: true, submitted, total: pendingTemplates.length, results });
+  } catch (error) {
+    logger.error('Error in delete-and-resubmit', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
 // POST /api/templates/submit-pending - Soumettre les templates PENDING à Meta
 // Utilisé après le seed local pour finaliser la soumission depuis Railway
 // ============================================
