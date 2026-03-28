@@ -435,6 +435,118 @@ router.post('/whatsapp/change-category', async (req, res) => {
 });
 
 // ============================================
+// POST /webhooks/whatsapp/recreate-as-utility - Recreate MARKETING templates as UTILITY with new names
+// ============================================
+router.post('/whatsapp/recreate-as-utility', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Token requis' });
+
+    const axios = require('axios');
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+
+    // Find all MARKETING templates in DB
+    const marketingTemplates = await prisma.template.findMany({
+      where: { category: 'MARKETING' }
+    });
+
+    if (marketingTemplates.length === 0) {
+      return res.json({ success: true, message: 'Aucun template MARKETING', created: 0 });
+    }
+
+    const results = [];
+
+    for (const tpl of marketingTemplates) {
+      const newName = tpl.name + '_v2';
+
+      // Check if v2 already exists
+      const existing = await prisma.template.findFirst({ where: { name: newName } });
+      if (existing) {
+        results.push({ name: newName, status: 'skipped', reason: 'Already exists' });
+        continue;
+      }
+
+      // Upload image header if needed
+      let headerHandle = null;
+      if (tpl.headerType === 'IMAGE' && tpl.headerContent && tpl.headerContent.startsWith('http')) {
+        const tempPath = path.join(os.tmpdir(), `cppf_v2_${Date.now()}.jpg`);
+        try {
+          const imgResp = await axios.get(tpl.headerContent, { responseType: 'arraybuffer', timeout: 60000 });
+          fs.writeFileSync(tempPath, imgResp.data);
+          const uploadResult = await whatsappService.uploadMediaForTemplate(tempPath, 'image/jpeg');
+          if (uploadResult.success) headerHandle = uploadResult.headerHandle;
+          else logger.warn(`Header upload failed for "${newName}": ${uploadResult.error}`);
+        } catch (dlErr) {
+          logger.warn(`Image download failed for "${newName}": ${dlErr.message}`);
+        } finally {
+          try { fs.unlinkSync(tempPath); } catch {}
+        }
+      }
+
+      // Restore original URLs for Meta
+      let metaButtons = null;
+      if (Array.isArray(tpl.buttons)) {
+        metaButtons = tpl.buttons.map(btn => {
+          if (btn.type === 'URL' && btn.redirectUrl) {
+            return { type: btn.type, text: btn.text, url: btn.redirectUrl };
+          }
+          return { type: btn.type, text: btn.text, url: btn.url || null, phone: btn.phone || null };
+        });
+      }
+
+      // Create on Meta as UTILITY
+      const metaResult = await whatsappService.createTemplate({
+        name: newName,
+        category: 'utility',
+        content: tpl.content,
+        language: tpl.language || 'fr',
+        headerType: tpl.headerType || 'NONE',
+        headerContent: tpl.headerType === 'TEXT' ? tpl.headerContent : null,
+        headerHandle,
+        buttons: metaButtons,
+        footer: tpl.footer || null
+      });
+
+      if (metaResult.success) {
+        // Create new template in DB
+        await prisma.template.create({
+          data: {
+            name: newName,
+            displayName: tpl.displayName + ' (Utility)',
+            category: 'UTILITY',
+            content: tpl.content,
+            variables: tpl.variables || [],
+            language: tpl.language,
+            headerType: tpl.headerType,
+            headerContent: tpl.headerContent,
+            buttons: tpl.buttons,
+            footer: tpl.footer,
+            status: 'PENDING',
+            metaId: metaResult.templateId
+          }
+        });
+        results.push({ name: newName, status: 'submitted', metaId: metaResult.templateId });
+      } else {
+        results.push({ name: newName, status: 'error', error: metaResult.error, details: metaResult.details });
+      }
+
+      // Rate limit
+      await new Promise(r => setTimeout(r, 3000));
+    }
+
+    const submitted = results.filter(r => r.status === 'submitted').length;
+    res.json({ success: true, submitted, total: marketingTemplates.length, results });
+  } catch (error) {
+    logger.error('Error recreating templates as utility', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
 // GET /webhooks/whatsapp/debug-meta - Debug Meta API: templates, phone, account
 // ============================================
 router.get('/whatsapp/debug-meta', async (req, res) => {
