@@ -251,8 +251,9 @@ class WhatsAppCloudService {
       };
     } catch (error) {
       const errMsg = error.response?.data?.error?.message || error.message;
-      logger.error('Erreur création template', { error: errMsg, details: error.response?.data });
-      return { success: false, error: errMsg };
+      const errDetails = error.response?.data?.error || {};
+      logger.error('Erreur création template', { error: errMsg, code: errDetails.code, type: errDetails.type, fbtrace: errDetails.fbtrace_id, details: JSON.stringify(error.response?.data) });
+      return { success: false, error: errMsg, errorCode: errDetails.code, errorType: errDetails.type, details: error.response?.data };
     }
   }
 

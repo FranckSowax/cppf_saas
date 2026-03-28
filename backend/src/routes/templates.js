@@ -799,7 +799,7 @@ router.post('/delete-and-resubmit', authenticate, async (req, res) => {
         });
         results.push({ name: tpl.name, status: 'submitted', metaId: metaResult.templateId });
       } else {
-        results.push({ name: tpl.name, status: 'error', error: metaResult.error });
+        results.push({ name: tpl.name, status: 'error', error: metaResult.error, details: metaResult.details, headerHandle: !!headerHandle });
       }
 
       // Rate limit between templates
