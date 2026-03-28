@@ -874,7 +874,7 @@
                             {step === 0 && (
                                 <div className="space-y-4">
                                     <Input label="Nom de la campagne" placeholder="Ex: Relance App Mobile - Fevrier" value={form.name} onChange={v => setForm({...form, name: v})} />
-                                    <Select label="Type" value={form.type} onChange={v => setForm({...form, type: v})} options={[{ value: '', label: 'Selectionner...' }, { value: 'REACTIVATION', label: 'Reactivation' }, { value: 'MARKETING', label: 'Marketing' }, { value: 'NOTIFICATION', label: 'Notification' }, { value: 'ALERT', label: 'Alerte' }]} />
+                                    <Select label="Type" value={form.type} onChange={v => setForm({...form, type: v})} options={[{ value: '', label: 'Selectionner...' }, { value: 'INFORMATION', label: 'Information' }, { value: 'PRESTATION', label: 'Prestation' }, { value: 'RAPPEL', label: 'Rappel' }, { value: 'RETRAITE', label: 'Retraite' }, { value: 'FAMILIALE', label: 'Familiale' }, { value: 'INSTITUTIONNEL', label: 'Institutionnel' }]} />
                                 </div>
                             )}
 
@@ -1109,7 +1109,7 @@
                                 <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                                     <Input label="Nom de la campagne" value={editForm.name} onChange={v => setEditForm({...editForm, name: v})} />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <Select label="Type" value={editForm.type} onChange={v => setEditForm({...editForm, type: v})} options={[{ value: 'REACTIVATION', label: 'Reactivation' }, { value: 'MARKETING', label: 'Marketing' }, { value: 'NOTIFICATION', label: 'Notification' }, { value: 'ALERT', label: 'Alerte' }]} />
+                                        <Select label="Type" value={editForm.type} onChange={v => setEditForm({...editForm, type: v})} options={[{ value: 'INFORMATION', label: 'Information' }, { value: 'PRESTATION', label: 'Prestation' }, { value: 'RAPPEL', label: 'Rappel' }, { value: 'RETRAITE', label: 'Retraite' }, { value: 'FAMILIALE', label: 'Familiale' }, { value: 'INSTITUTIONNEL', label: 'Institutionnel' }]} />
                                         <Select label="Template" value={editForm.templateId} onChange={v => setEditForm({...editForm, templateId: v})} options={[{ value: '', label: 'Selectionner...' }, ...templates.map(t => ({ value: t.id, label: t.displayName || t.name }))]} />
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

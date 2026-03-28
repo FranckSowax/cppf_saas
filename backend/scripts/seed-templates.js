@@ -34,7 +34,7 @@ if (supabaseUrl && supabaseKey) {
 // Tracking URL base
 const TRACKING_BASE = process.env.TRACKING_BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/t/{{1}}`
-  : 'https://cppf-whatsapp-production.up.railway.app/t/{{1}}');
+  : 'https://cppfsaas-production.up.railway.app/t/{{1}}');
 
 // ============================================
 // TEMPLATES DEFINITIONS

@@ -27,7 +27,7 @@ const upload = multer({
 // Stocke l'URL originale dans redirectUrl et remplace par l'URL de tracking
 const TRACKING_BASE = process.env.TRACKING_BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/t/{{1}}`
-  : 'https://cppf-whatsapp-production.up.railway.app/t/{{1}}');
+  : 'https://cppfsaas-production.up.railway.app/t/{{1}}');
 
 function applyTrackingToButtons(buttons) {
   if (!buttons || !Array.isArray(buttons)) return buttons;
@@ -262,7 +262,11 @@ router.post('/', authenticate, authorize(['template:create']), async (req, res) 
       const fs = require('fs');
       const axios = require('axios');
       const os = require('os');
-      const mimeType = headerType === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
+
+      // Detect MIME type from URL extension or headerType
+      let mimeType = headerType === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
+      if (headerContent.match(/\.png(\?|$)/i)) mimeType = 'image/png';
+      else if (headerContent.match(/\.webp(\?|$)/i)) mimeType = 'image/webp';
 
       let filePath = null;
       let tempFile = false;
@@ -271,11 +275,14 @@ router.post('/', authenticate, authorize(['template:create']), async (req, res) 
         // URL (Supabase Storage ou autre) — telecharger en fichier temporaire
         try {
           const response = await axios.get(headerContent, { responseType: 'arraybuffer', timeout: 60000 });
-          const ext = headerType === 'VIDEO' ? '.mp4' : '.jpg';
+          // Use content-type from response if available
+          const contentType = response.headers['content-type'];
+          if (contentType && !contentType.includes('octet-stream')) mimeType = contentType.split(';')[0];
+          const ext = headerType === 'VIDEO' ? '.mp4' : (mimeType.includes('png') ? '.png' : mimeType.includes('webp') ? '.webp' : '.jpg');
           filePath = path.join(os.tmpdir(), `cppf_upload_${Date.now()}${ext}`);
           fs.writeFileSync(filePath, response.data);
           tempFile = true;
-          logger.info('Media downloaded from URL for Meta upload', { url: headerContent.substring(0, 80), size: response.data.length });
+          logger.info('Media downloaded from URL for Meta upload', { url: headerContent.substring(0, 80), size: response.data.length, mimeType });
         } catch (dlErr) {
           logger.warn('Failed to download media from URL', { url: headerContent, error: dlErr.message });
         }
@@ -301,10 +308,18 @@ router.post('/', authenticate, authorize(['template:create']), async (req, res) 
       }
     }
 
-    // Auto-tracking: convertir les boutons URL en liens de tracking
+    // Auto-tracking: convertir les boutons URL en liens de tracking (pour l'envoi)
     const trackedButtons = applyTrackingToButtons(buttons);
 
-    // Créer le template dans la base de données
+    // Pour Meta: utiliser les URLs originales (pas de tracking, pas d'emojis)
+    const metaButtons = buttons && buttons.length > 0 ? buttons.map(btn => ({
+      type: btn.type,
+      text: btn.text,
+      url: btn.url || null,
+      phone: btn.phone || null
+    })) : null;
+
+    // Créer le template dans la base de données (avec tracking pour l'envoi)
     const template = await prisma.template.create({
       data: {
         name: name.toLowerCase().replace(/\s+/g, '_'),
@@ -322,16 +337,16 @@ router.post('/', authenticate, authorize(['template:create']), async (req, res) 
       }
     });
 
-    // Soumettre à Meta pour approbation via WhatsApp Cloud API
+    // Soumettre à Meta avec URLs originales (pas de tracking)
     const metaResult = await whatsappService.createTemplate({
       name: template.name,
       category: template.category.toLowerCase(),
       content,
       language,
       headerType: headerType || 'NONE',
-      headerContent,
+      headerContent: headerType === 'TEXT' ? headerContent : null,
       headerHandle,
-      buttons: trackedButtons || null,
+      buttons: metaButtons,
       footer: footer || null
     });
 
@@ -434,8 +449,23 @@ router.post('/:id/duplicate', authenticate, authorize(['template:create']), asyn
     const newHeaderType = headerType !== undefined ? headerType : (source.headerType || 'NONE');
     const newHeaderContent = headerContent !== undefined ? headerContent : source.headerContent;
     const rawButtons = buttons !== undefined ? buttons : source.buttons;
-    const newButtons = applyTrackingToButtons(rawButtons);
+    // For raw buttons from source, extract original URLs (redirectUrl) if they were already tracked
+    const originalButtons = Array.isArray(rawButtons) ? rawButtons.map(btn => {
+      if (btn.type === 'URL' && btn.redirectUrl) {
+        return { ...btn, url: btn.redirectUrl, redirectUrl: undefined };
+      }
+      return btn;
+    }) : rawButtons;
+    const trackedButtons = applyTrackingToButtons(originalButtons);
     const newFooter = footer !== undefined ? footer : source.footer;
+
+    // Pour Meta: utiliser les URLs originales (pas de tracking)
+    const metaButtons = originalButtons && Array.isArray(originalButtons) && originalButtons.length > 0 ? originalButtons.map(btn => ({
+      type: btn.type,
+      text: btn.text,
+      url: btn.url || null,
+      phone: btn.phone || null
+    })) : null;
 
     // Upload media header if needed (local file or URL)
     let headerHandle = null;
@@ -443,17 +473,25 @@ router.post('/:id/duplicate', authenticate, authorize(['template:create']), asyn
       const fs = require('fs');
       const axios = require('axios');
       const os = require('os');
-      const mimeType = newHeaderType === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
+
+      // Detect MIME type from URL extension or headerType
+      let mimeType = newHeaderType === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
+      if (newHeaderContent.match(/\.png(\?|$)/i)) mimeType = 'image/png';
+      else if (newHeaderContent.match(/\.webp(\?|$)/i)) mimeType = 'image/webp';
+
       let filePath = null;
       let tempFile = false;
 
       if (newHeaderContent.startsWith('http://') || newHeaderContent.startsWith('https://')) {
         try {
           const response = await axios.get(newHeaderContent, { responseType: 'arraybuffer', timeout: 60000 });
-          const ext = newHeaderType === 'VIDEO' ? '.mp4' : '.jpg';
+          const contentType = response.headers['content-type'];
+          if (contentType && !contentType.includes('octet-stream')) mimeType = contentType.split(';')[0];
+          const ext = newHeaderType === 'VIDEO' ? '.mp4' : (mimeType.includes('png') ? '.png' : mimeType.includes('webp') ? '.webp' : '.jpg');
           filePath = path.join(os.tmpdir(), `cppf_dup_${Date.now()}${ext}`);
           fs.writeFileSync(filePath, response.data);
           tempFile = true;
+          logger.info('Media downloaded for duplicate', { url: newHeaderContent.substring(0, 80), size: response.data.length, mimeType });
         } catch (dlErr) {
           logger.warn('Failed to download media for duplicate', { error: dlErr.message });
         }
@@ -470,6 +508,7 @@ router.post('/:id/duplicate', authenticate, authorize(['template:create']), asyn
       }
     }
 
+    // Créer en DB avec tracking URLs pour l'envoi
     const template = await prisma.template.create({
       data: {
         name: newName,
@@ -480,22 +519,22 @@ router.post('/:id/duplicate', authenticate, authorize(['template:create']), asyn
         language: source.language,
         headerType: newHeaderType,
         headerContent: newHeaderContent,
-        buttons: newButtons,
+        buttons: trackedButtons,
         footer: newFooter,
         status: 'PENDING'
       }
     });
 
-    // Soumettre à Meta pour approbation
+    // Soumettre à Meta avec URLs originales (pas de tracking)
     const metaResult = await whatsappService.createTemplate({
       name: template.name,
       category: template.category.toLowerCase(),
       content: newContent,
       language: template.language,
       headerType: newHeaderType,
-      headerContent: newHeaderContent,
+      headerContent: newHeaderType === 'TEXT' ? newHeaderContent : null,
       headerHandle,
-      buttons: newButtons,
+      buttons: metaButtons,
       footer: newFooter
     });
 
