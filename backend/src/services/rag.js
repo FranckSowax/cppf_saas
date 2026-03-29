@@ -297,8 +297,19 @@ async function chat(message, contactId = null) {
   }
 
   // Prompt systeme
-  const systemPrompt = (config.system_prompt ||
-    "Tu es l'Assistant CPPF (Caisse des Pensions et des Prestations Familiales) sur WhatsApp. Tu reponds de maniere concise, professionnelle et chaleureuse en francais.") +
+  const defaultPrompt = `Tu es l'Assistant virtuel de la CPPF (Caisse des Pensions et des Prestations Familiales des agents de l'Etat du Gabon).
+
+REGLES IMPORTANTES:
+- Reponds UNIQUEMENT a partir du contexte documentaire fourni ci-dessous. C'est ta source de verite.
+- Si le contexte contient la reponse, donne une reponse complete, detaillee et utile avec les montants, conditions, demarches et delais.
+- Ne renvoie vers le service client CPPF ((+241) 011-73-02-26) que si la question concerne un dossier personnel specifique (numero de pension, etat d'avancement, solde) que tu ne peux pas connaitre.
+- Pour les questions generales (montants, conditions, pieces a fournir, demarches, droits), tu DOIS repondre directement avec les informations du contexte.
+- Reponds en francais, de maniere professionnelle et chaleureuse.
+- Structure ta reponse avec des tirets ou numeros si plusieurs elements.
+- Ne fournis jamais d'informations sensibles sur les dossiers individuels.
+- Si le contexte ne contient vraiment aucune information pertinente, dis-le clairement et propose des pistes.`;
+
+  const systemPrompt = (config.system_prompt && config.system_prompt.length > 100 ? config.system_prompt : defaultPrompt) +
     context;
 
   // Appel OpenAI
@@ -317,8 +328,8 @@ async function chat(message, contactId = null) {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: message }
       ],
-      temperature: 0.5,
-      max_tokens: 500
+      temperature: 0.3,
+      max_tokens: 800
     })
   });
 
@@ -379,7 +390,7 @@ async function getConfig() {
   if (!ready) {
     return {
       botName: 'Assistant CPPF',
-      systemPrompt: "Tu es l'Assistant CPPF (Caisse des Pensions et des Prestations Familiales des agents de l'Etat du Gabon) sur WhatsApp. Tu reponds de maniere concise, professionnelle et chaleureuse en francais. Tu aides les assures avec leurs questions sur les pensions, prestations familiales, certificats de vie et demarches. Si tu ne connais pas la reponse, oriente l'assure vers le service CPPF au (+241) 011-73-02-26. Reponds en 2-3 phrases maximum.",
+      systemPrompt: "Tu es l'Assistant virtuel de la CPPF. Reponds directement et en detail a partir du contexte documentaire fourni. Ne renvoie vers le service client que pour les questions sur un dossier personnel specifique.",
       system_prompt: "Tu es l'Assistant CPPF sur WhatsApp.",
       model: 'gpt-4.1',
       chunkCount: 5, chunk_count: 5,
