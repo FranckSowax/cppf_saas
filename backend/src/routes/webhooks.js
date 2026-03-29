@@ -551,6 +551,66 @@ router.post('/whatsapp/recreate-as-utility', async (req, res) => {
 });
 
 // ============================================
+// GET /webhooks/whatsapp/debug-webhook - Check & fix webhook subscription on Meta
+// ============================================
+router.get('/whatsapp/debug-webhook', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Token requis' });
+
+    const axios = require('axios');
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const appId = process.env.WHATSAPP_APP_ID;
+    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+    const debug = {};
+
+    // 1. Check app webhook subscriptions
+    try {
+      const subRes = await axios.get(`https://graph.facebook.com/v21.0/${appId}/subscriptions`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      debug.appSubscriptions = subRes.data;
+    } catch (e) {
+      debug.appSubscriptions = { error: e.response?.data?.error?.message || e.message };
+    }
+
+    // 2. Check WABA subscribed apps
+    try {
+      const appsRes = await axios.get(`https://graph.facebook.com/v21.0/${wabaId}/subscribed_apps`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      debug.wabaSubscribedApps = appsRes.data;
+    } catch (e) {
+      debug.wabaSubscribedApps = { error: e.response?.data?.error?.message || e.message };
+    }
+
+    // 3. Try to subscribe the app to the WABA (fixes missing subscription)
+    try {
+      const subscribeRes = await axios.post(`https://graph.facebook.com/v21.0/${wabaId}/subscribed_apps`, {}, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      debug.subscribeResult = subscribeRes.data;
+    } catch (e) {
+      debug.subscribeResult = { error: e.response?.data?.error?.message || e.message };
+    }
+
+    // 4. Verify config
+    debug.config = {
+      appId,
+      wabaId,
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID,
+      verifyTokenSet: !!process.env.WHATSAPP_VERIFY_TOKEN,
+      appSecretSet: !!process.env.WHATSAPP_APP_SECRET,
+      callbackUrl: `https://${process.env.RAILWAY_PUBLIC_DOMAIN || 'cppfsaas-production.up.railway.app'}/api/webhooks/whatsapp`
+    };
+
+    res.json(debug);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
 // GET /webhooks/whatsapp/debug-meta - Debug Meta API: templates, phone, account
 // ============================================
 router.get('/whatsapp/debug-meta', async (req, res) => {
