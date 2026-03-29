@@ -361,7 +361,7 @@ router.get('/sessions/enrichment-stats', authenticate, async (req, res) => {
       where,
       select: {
         intentCategory: true,
-        productMentioned: true,
+        serviceMentioned: true,
         sentiment: true,
         urgencyLevel: true,
         resolutionStatus: true,
@@ -388,8 +388,8 @@ router.get('/sessions/enrichment-stats', authenticate, async (req, res) => {
     // Product breakdown
     const productBreakdown = {};
     sessions.forEach(s => {
-      if (s.productMentioned && s.productMentioned !== 'NONE') {
-        productBreakdown[s.productMentioned] = (productBreakdown[s.productMentioned] || 0) + 1;
+      if (s.serviceMentioned && s.serviceMentioned !== 'NONE') {
+        productBreakdown[s.serviceMentioned] = (productBreakdown[s.serviceMentioned] || 0) + 1;
       }
     });
 
