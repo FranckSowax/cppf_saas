@@ -586,18 +586,16 @@ router.post('/whatsapp/enable-tracking', async (req, res) => {
     const results = [];
 
     for (const tpl of toFix) {
-      // Step 1: Delete from Meta
-      try {
-        await axios.delete(`https://graph.facebook.com/v21.0/${wabaId}/message_templates`, {
-          params: { name: tpl.name },
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        logger.info(`Deleted "${tpl.name}" from Meta for tracking enable`);
-      } catch (delErr) {
-        logger.info(`Delete "${tpl.name}": ${delErr.response?.data?.error?.message || delErr.message}`);
-      }
+      // Create with new name (suffix _v3) to avoid Meta's 4-week deletion cooldown
+      const baseName = tpl.name.replace(/_v\d+$/, ''); // strip existing _v2, _v3 etc
+      const newName = baseName + '_v3';
 
-      await new Promise(r => setTimeout(r, 3000));
+      // Check if _v3 already exists
+      const existingV3 = await prisma.template.findFirst({ where: { name: newName } });
+      if (existingV3) {
+        results.push({ name: newName, status: 'skipped', reason: 'Already exists' });
+        continue;
+      }
 
       // Step 2: Upload image header if needed
       let headerHandle = null;
@@ -616,8 +614,7 @@ router.post('/whatsapp/enable-tracking', async (req, res) => {
         }
       }
 
-      // Step 3: Build buttons with tracking URL for Meta
-      // All URL buttons get the same dynamic URL pattern /t/{{1}}
+      // Step 2: Build buttons with tracking URL for Meta
       const metaButtons = tpl.buttons.map(btn => {
         if (btn.type === 'URL') {
           return { type: btn.type, text: btn.text, url: TRACKING_BASE };
@@ -625,9 +622,9 @@ router.post('/whatsapp/enable-tracking', async (req, res) => {
         return { type: btn.type, text: btn.text, url: btn.url || null, phone: btn.phone || null };
       });
 
-      // Step 4: Recreate on Meta with dynamic URL buttons
+      // Step 3: Create on Meta with dynamic URL buttons (new name)
       const metaResult = await whatsappService.createTemplate({
-        name: tpl.name,
+        name: newName,
         category: (tpl.category || 'MARKETING').toLowerCase(),
         content: tpl.content,
         language: tpl.language || 'fr',
@@ -639,7 +636,7 @@ router.post('/whatsapp/enable-tracking', async (req, res) => {
       });
 
       if (metaResult.success) {
-        // Step 5: Update DB with tracking URLs
+        // Step 4: Create new template in DB with tracking URLs
         const trackedButtons = tpl.buttons.map(btn => {
           if (btn.type === 'URL') {
             const originalUrl = btn.redirectUrl || btn.url;
@@ -648,13 +645,25 @@ router.post('/whatsapp/enable-tracking', async (req, res) => {
           return btn;
         });
 
-        await prisma.template.update({
-          where: { id: tpl.id },
-          data: { metaId: metaResult.templateId, status: 'PENDING', buttons: trackedButtons }
+        await prisma.template.create({
+          data: {
+            name: newName,
+            displayName: tpl.displayName.replace(/ \(Utility\)$/, '') + ' (Tracked)',
+            category: tpl.category,
+            content: tpl.content,
+            variables: tpl.variables || [],
+            language: tpl.language,
+            headerType: tpl.headerType,
+            headerContent: tpl.headerContent,
+            buttons: trackedButtons,
+            footer: tpl.footer,
+            status: 'PENDING',
+            metaId: metaResult.templateId
+          }
         });
-        results.push({ name: tpl.name, status: 'submitted', metaId: metaResult.templateId });
+        results.push({ name: newName, status: 'submitted', metaId: metaResult.templateId, from: tpl.name });
       } else {
-        results.push({ name: tpl.name, status: 'error', error: metaResult.error, details: metaResult.details });
+        results.push({ name: newName, status: 'error', error: metaResult.error, details: metaResult.details });
       }
 
       await new Promise(r => setTimeout(r, 2000));
