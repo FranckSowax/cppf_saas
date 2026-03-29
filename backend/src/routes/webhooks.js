@@ -551,6 +551,124 @@ router.post('/whatsapp/recreate-as-utility', async (req, res) => {
 });
 
 // ============================================
+// POST /webhooks/whatsapp/enable-tracking - Recreate templates on Meta with dynamic tracking URLs
+// Deletes from Meta, recreates with /t/{{1}} buttons, updates DB
+// ============================================
+router.post('/whatsapp/enable-tracking', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Token requis' });
+
+    const axios = require('axios');
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+    const TRACKING_BASE = process.env.TRACKING_BASE_URL || (process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/t/{{1}}`
+      : 'https://cppfsaas-production.up.railway.app/t/{{1}}');
+
+    // Find templates with URL buttons that don't have tracking
+    const allTemplates = await prisma.template.findMany({
+      where: { status: { in: ['APPROVED', 'PENDING'] } }
+    });
+
+    const toFix = allTemplates.filter(tpl => {
+      if (!Array.isArray(tpl.buttons)) return false;
+      return tpl.buttons.some(btn => btn.type === 'URL' && btn.url && !btn.url.includes('/t/{{1}}'));
+    });
+
+    if (toFix.length === 0) {
+      return res.json({ success: true, message: 'Tous les templates ont deja le tracking', fixed: 0 });
+    }
+
+    const results = [];
+
+    for (const tpl of toFix) {
+      // Step 1: Delete from Meta
+      try {
+        await axios.delete(`https://graph.facebook.com/v21.0/${wabaId}/message_templates`, {
+          params: { name: tpl.name },
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        logger.info(`Deleted "${tpl.name}" from Meta for tracking enable`);
+      } catch (delErr) {
+        logger.info(`Delete "${tpl.name}": ${delErr.response?.data?.error?.message || delErr.message}`);
+      }
+
+      await new Promise(r => setTimeout(r, 3000));
+
+      // Step 2: Upload image header if needed
+      let headerHandle = null;
+      if (tpl.headerType === 'IMAGE' && tpl.headerContent && tpl.headerContent.startsWith('http')) {
+        const tempPath = path.join(os.tmpdir(), `cppf_track_${Date.now()}.jpg`);
+        try {
+          const imgResp = await axios.get(tpl.headerContent, { responseType: 'arraybuffer', timeout: 60000 });
+          fs.writeFileSync(tempPath, imgResp.data);
+          const uploadResult = await whatsappService.uploadMediaForTemplate(tempPath, 'image/jpeg');
+          if (uploadResult.success) headerHandle = uploadResult.headerHandle;
+          else logger.warn(`Header upload failed for "${tpl.name}": ${uploadResult.error}`);
+        } catch (dlErr) {
+          logger.warn(`Image download failed for "${tpl.name}": ${dlErr.message}`);
+        } finally {
+          try { fs.unlinkSync(tempPath); } catch {}
+        }
+      }
+
+      // Step 3: Build buttons with tracking URL for Meta
+      // All URL buttons get the same dynamic URL pattern /t/{{1}}
+      const metaButtons = tpl.buttons.map(btn => {
+        if (btn.type === 'URL') {
+          return { type: btn.type, text: btn.text, url: TRACKING_BASE };
+        }
+        return { type: btn.type, text: btn.text, url: btn.url || null, phone: btn.phone || null };
+      });
+
+      // Step 4: Recreate on Meta with dynamic URL buttons
+      const metaResult = await whatsappService.createTemplate({
+        name: tpl.name,
+        category: (tpl.category || 'MARKETING').toLowerCase(),
+        content: tpl.content,
+        language: tpl.language || 'fr',
+        headerType: tpl.headerType || 'NONE',
+        headerContent: tpl.headerType === 'TEXT' ? tpl.headerContent : null,
+        headerHandle,
+        buttons: metaButtons,
+        footer: tpl.footer || null
+      });
+
+      if (metaResult.success) {
+        // Step 5: Update DB with tracking URLs
+        const trackedButtons = tpl.buttons.map(btn => {
+          if (btn.type === 'URL') {
+            const originalUrl = btn.redirectUrl || btn.url;
+            return { ...btn, url: TRACKING_BASE, redirectUrl: originalUrl };
+          }
+          return btn;
+        });
+
+        await prisma.template.update({
+          where: { id: tpl.id },
+          data: { metaId: metaResult.templateId, status: 'PENDING', buttons: trackedButtons }
+        });
+        results.push({ name: tpl.name, status: 'submitted', metaId: metaResult.templateId });
+      } else {
+        results.push({ name: tpl.name, status: 'error', error: metaResult.error, details: metaResult.details });
+      }
+
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    const submitted = results.filter(r => r.status === 'submitted').length;
+    res.json({ success: true, submitted, total: toFix.length, results });
+  } catch (error) {
+    logger.error('Error enabling tracking', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
 // GET /webhooks/whatsapp/debug-webhook - Check & fix webhook subscription on Meta
 // ============================================
 router.get('/whatsapp/debug-webhook', async (req, res) => {

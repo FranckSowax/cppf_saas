@@ -706,11 +706,17 @@ router.post('/sync-all', authenticate, async (req, res) => {
         const hasStableUrl = existing.headerContent && existing.headerContent.includes('supabase.co');
         const syncHeaderContent = hasStableUrl ? existing.headerContent : headerContent;
 
-        // Preserve redirectUrl in buttons if already set
+        // Preserve tracking URLs and redirectUrl from DB (Meta only has static URLs)
         const syncButtons = buttons?.map((btn, i) => {
           const existingBtn = Array.isArray(existing.buttons) ? existing.buttons[i] : null;
-          if (existingBtn?.redirectUrl && !btn.redirectUrl) {
-            return { ...btn, redirectUrl: existingBtn.redirectUrl };
+          if (existingBtn) {
+            // Keep tracking URL and redirectUrl from DB
+            if (existingBtn.url && existingBtn.url.includes('/t/{{1}}')) {
+              return { ...btn, url: existingBtn.url, redirectUrl: existingBtn.redirectUrl || btn.url };
+            }
+            if (existingBtn.redirectUrl && !btn.redirectUrl) {
+              return { ...btn, redirectUrl: existingBtn.redirectUrl };
+            }
           }
           return btn;
         }) || buttons;
