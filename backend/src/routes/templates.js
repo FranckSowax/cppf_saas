@@ -308,11 +308,16 @@ router.post('/', authenticate, authorize(['template:create']), async (req, res) 
       }
     }
 
+    // Filtrer les boutons invalides (texte ou URL vide)
+    const validButtons = buttons && buttons.length > 0
+      ? buttons.filter(btn => btn.text && btn.text.trim() && (btn.type !== 'URL' || (btn.url && btn.url.trim())))
+      : [];
+
     // Auto-tracking: convertir les boutons URL en liens de tracking (pour l'envoi)
-    const trackedButtons = applyTrackingToButtons(buttons);
+    const trackedButtons = applyTrackingToButtons(validButtons.length > 0 ? validButtons : null);
 
     // Pour Meta: utiliser les URLs originales (pas de tracking, pas d'emojis)
-    const metaButtons = buttons && buttons.length > 0 ? buttons.map(btn => ({
+    const metaButtons = validButtons.length > 0 ? validButtons.map(btn => ({
       type: btn.type,
       text: btn.text,
       url: btn.url || null,
@@ -369,8 +374,11 @@ router.post('/', authenticate, authorize(['template:create']), async (req, res) 
 
     res.status(201).json({
       ...template,
-      message: 'Template créé et soumis pour approbation Meta. Délai: 24-48h.',
-      metaStatus: metaResult.success ? 'submitted' : metaResult.error
+      message: metaResult.success
+        ? 'Template créé et soumis pour approbation Meta. Délai: 24-48h.'
+        : 'Template créé en base mais la soumission Meta a échoué: ' + metaResult.error,
+      metaStatus: metaResult.success ? 'submitted' : 'error',
+      metaError: metaResult.success ? null : metaResult.error
     });
   } catch (error) {
     logger.error('Error creating template', { error: error.message });
