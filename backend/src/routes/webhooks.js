@@ -281,7 +281,11 @@ router.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'webhooks',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    verifyTokenSet: !!process.env.WHATSAPP_VERIFY_TOKEN,
+    appSecretSet: !!process.env.WHATSAPP_APP_SECRET,
+    accessTokenSet: !!process.env.WHATSAPP_ACCESS_TOKEN,
+    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || null
   });
 });
 
