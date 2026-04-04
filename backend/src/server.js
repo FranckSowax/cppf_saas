@@ -181,9 +181,13 @@ app.get('/api/preuve-de-vie/list', async (req, res) => {
         matricule: c.matricule,
         category: c.category,
         status: c.customAttributes.preuveDeVie.status,
+        mode: c.customAttributes.preuveDeVie.mode || 'api',
         date: c.customAttributes.preuveDeVie.date,
         similarity: c.customAttributes.preuveDeVie.similarity,
         device: c.customAttributes.preuveDeVie.device,
+        photoRef: c.customAttributes.preuveDeVie.photoRef || null,
+        photoSelfie: c.customAttributes.preuveDeVie.photoSelfie || null,
+        validatedBy: c.customAttributes.preuveDeVie.validatedBy || null,
         dernierCertificatVie: c.dernierCertificatVie
       }));
 
@@ -191,6 +195,155 @@ app.get('/api/preuve-de-vie/list', async (req, res) => {
     res.json({ data: results, total: results.length });
   } catch (err) {
     logger.error('Error listing preuve de vie', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/preuve-de-vie/upload-photo - Upload photo de reference ou selfie vers Supabase
+app.post('/api/preuve-de-vie/upload-photo', async (req, res) => {
+  try {
+    const multer = require('multer');
+    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }).single('file');
+
+    upload(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: 'Aucun fichier fourni' });
+
+      const supabase = require('./lib/supabase');
+      if (!supabase) return res.status(500).json({ error: 'Supabase non configure' });
+
+      const { contactId, type } = req.body; // type: 'reference' ou 'selfie'
+      const timestamp = Date.now();
+      const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `preuve-de-vie/${type || 'photo'}/${timestamp}_${safeName}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('templates-media')
+        .upload(storagePath, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+
+      if (uploadErr) return res.status(500).json({ error: uploadErr.message });
+
+      const { data: urlData } = supabase.storage.from('templates-media').getPublicUrl(storagePath);
+      const publicUrl = urlData.publicUrl;
+
+      // Si contactId fourni, sauvegarder dans customAttributes
+      if (contactId) {
+        const { PrismaClient } = require('@prisma/client');
+        const prisma = new PrismaClient();
+        const contact = await prisma.contact.findUnique({ where: { id: contactId } });
+        if (contact) {
+          const attrs = contact.customAttributes || {};
+          if (!attrs.preuveDeVie) attrs.preuveDeVie = {};
+          if (type === 'reference') {
+            attrs.preuveDeVie.photoRef = publicUrl;
+          } else {
+            attrs.preuveDeVie.photoSelfie = publicUrl;
+            attrs.preuveDeVie.date = new Date().toISOString();
+            attrs.preuveDeVie.status = attrs.preuveDeVie.status || 'PENDING_REVIEW';
+            attrs.preuveDeVie.mode = 'manual';
+          }
+          await prisma.contact.update({ where: { id: contactId }, data: { customAttributes: attrs } });
+        }
+        await prisma.$disconnect();
+      }
+
+      logger.info('Preuve de vie photo uploaded', { type, contactId, path: storagePath });
+      res.json({ success: true, url: publicUrl, path: storagePath });
+    });
+  } catch (err) {
+    logger.error('Photo upload error', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/preuve-de-vie/validate - Validation manuelle par un agent CPPF
+app.post('/api/preuve-de-vie/validate', async (req, res) => {
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    const { contactId, status, agentName } = req.body; // status: VALIDATED ou REJECTED
+
+    if (!contactId || !status) return res.status(400).json({ error: 'contactId et status requis' });
+
+    const contact = await prisma.contact.findUnique({ where: { id: contactId } });
+    if (!contact) {
+      await prisma.$disconnect();
+      return res.status(404).json({ error: 'Contact non trouve' });
+    }
+
+    const attrs = contact.customAttributes || {};
+    if (!attrs.preuveDeVie) attrs.preuveDeVie = {};
+    attrs.preuveDeVie.status = status;
+    attrs.preuveDeVie.validatedBy = agentName || 'Agent CPPF';
+    attrs.preuveDeVie.validatedAt = new Date().toISOString();
+    attrs.preuveDeVie.mode = attrs.preuveDeVie.mode || 'manual';
+
+    const updateData = { customAttributes: attrs };
+    if (status === 'VALIDATED') updateData.dernierCertificatVie = new Date();
+
+    await prisma.contact.update({ where: { id: contactId }, data: updateData });
+
+    // Envoyer confirmation WhatsApp
+    if (status === 'VALIDATED' && contact.phone) {
+      const whatsappService = require('./services/whatsapp');
+      await whatsappService.sendMessage(contact.phone,
+        `Votre preuve de vie a ete validee par un agent CPPF le ${new Date().toLocaleDateString('fr-FR')}. Aucune action supplementaire n'est requise. — CPPF`
+      );
+    }
+
+    logger.info('Preuve de vie manually validated', { contactId, status, agentName });
+    await prisma.$disconnect();
+    res.json({ success: true, contactId, status });
+  } catch (err) {
+    logger.error('Manual validation error', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/preuve-de-vie/seed-demo - Injecter des donnees de demo
+app.post('/api/preuve-de-vie/seed-demo', async (req, res) => {
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+
+    const demoData = [
+      { name: 'Marie-Claire Ndong', status: 'VALIDATED', similarity: 92.5, mode: 'api', device: 'Android', daysAgo: 2 },
+      { name: 'Jean-Pierre Nzeng', status: 'PENDING_REVIEW', similarity: null, mode: 'manual', device: null, daysAgo: 1 },
+      { name: 'David Ondo Obiang', status: 'REJECTED', similarity: 34.2, mode: 'api', device: 'iPhone', daysAgo: 3 },
+      { name: 'Paul Mba Ondo', status: 'VALIDATED', similarity: 88.7, mode: 'api', device: 'Android', daysAgo: 5 },
+      { name: 'Aline Obame Nguema', status: 'PENDING_REVIEW', similarity: null, mode: 'manual', device: null, daysAgo: 0 },
+    ];
+
+    let seeded = 0;
+    for (const demo of demoData) {
+      const contact = await prisma.contact.findFirst({
+        where: { name: { contains: demo.name.split(' ')[0], mode: 'insensitive' } }
+      });
+      if (contact) {
+        const attrs = contact.customAttributes || {};
+        const date = new Date();
+        date.setDate(date.getDate() - demo.daysAgo);
+        attrs.preuveDeVie = {
+          status: demo.status,
+          mode: demo.mode,
+          date: date.toISOString(),
+          similarity: demo.similarity,
+          device: demo.device,
+          photoRef: 'https://openmediadata.s3.eu-west-3.amazonaws.com/face.jpg',
+          photoSelfie: demo.status !== 'PENDING_REVIEW' ? 'https://openmediadata.s3.eu-west-3.amazonaws.com/face.jpg' : null,
+          validatedBy: demo.mode === 'manual' ? null : undefined
+        };
+        const updateData = { customAttributes: attrs };
+        if (demo.status === 'VALIDATED') updateData.dernierCertificatVie = date;
+        await prisma.contact.update({ where: { id: contact.id }, data: updateData });
+        seeded++;
+      }
+    }
+
+    await prisma.$disconnect();
+    res.json({ success: true, seeded, total: demoData.length });
+  } catch (err) {
+    logger.error('Demo seed error', { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });

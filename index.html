@@ -3788,6 +3788,50 @@
         const PreuveDeVieView = () => {
             const { data, loading, error, refetch } = useApi('/preuve-de-vie/list');
             const [statusFilter, setStatusFilter] = useState('');
+            const [selectedItem, setSelectedItem] = useState(null);
+            const [validating, setValidating] = useState(false);
+            const [seeding, setSeeding] = useState(false);
+            const [uploadingRef, setUploadingRef] = useState(null);
+            const [uploadingSelfie, setUploadingSelfie] = useState(null);
+
+            const handleSeedDemo = async () => {
+                setSeeding(true);
+                try {
+                    await api('/preuve-de-vie/seed-demo', { method: 'POST' });
+                    refetch();
+                } catch (err) { alert(err.message); }
+                setSeeding(false);
+            };
+
+            const handleValidate = async (contactId, status) => {
+                setValidating(true);
+                try {
+                    await api('/preuve-de-vie/validate', { method: 'POST', body: JSON.stringify({ contactId, status, agentName: 'Agent CPPF' }) });
+                    setSelectedItem(null);
+                    refetch();
+                } catch (err) { alert(err.message); }
+                setValidating(false);
+            };
+
+            const handlePhotoUpload = async (file, contactId, type) => {
+                const setter = type === 'reference' ? setUploadingRef : setUploadingSelfie;
+                setter(contactId);
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('contactId', contactId);
+                    formData.append('type', type);
+                    const token = authStore.getToken();
+                    const resp = await fetch('/api/preuve-de-vie/upload-photo', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + token },
+                        body: formData
+                    });
+                    if (!resp.ok) throw new Error('Erreur upload');
+                    refetch();
+                } catch (err) { alert(err.message); }
+                setter(null);
+            };
 
             if (loading) return <Spinner />;
             if (error) return <ErrorBox message={error} onRetry={refetch} />;
@@ -3804,15 +3848,19 @@
 
             const statusMap = { VALIDATED: 'Valide', REJECTED: 'Refuse', PENDING_REVIEW: 'En attente' };
             const statusVariant = { VALIDATED: 'success', REJECTED: 'danger', PENDING_REVIEW: 'warning' };
+            const modeMap = { api: 'Automatique (IA)', manual: 'Manuel (Agent)' };
 
             return (
                 <div className="space-y-6">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div>
                             <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Preuve de Vie</h1>
-                            <p className="text-sm text-gray-500 mt-1">Verification d'identite biometrique des retraites</p>
+                            <p className="text-sm text-gray-500 mt-1">Verification biometrique — Mode API et Mode Manuel</p>
                         </div>
-                        <Button icon={Icons.Download} onClick={refetch}>Actualiser</Button>
+                        <div className="flex gap-2">
+                            <Button variant="outline" onClick={handleSeedDemo} disabled={seeding}>{seeding ? 'Chargement...' : 'Donnees demo'}</Button>
+                            <Button icon={Icons.Download} onClick={refetch}>Actualiser</Button>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -3830,9 +3878,89 @@
                         </Card>
                         <Card className="text-center cursor-pointer" onClick={() => setStatusFilter('PENDING_REVIEW')}>
                             <p className="text-2xl font-bold text-amber-700">{stats.pending}</p>
-                            <p className="text-xs text-gray-500 mt-1">En attente</p>
+                            <p className="text-xs text-amber-600 mt-1">En attente</p>
                         </Card>
                     </div>
+
+                    {/* Modal comparaison photos */}
+                    {selectedItem && (
+                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedItem(null)}>
+                            <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-900">Verification manuelle</h3>
+                                        <p className="text-sm text-gray-500">{selectedItem.name} — {selectedItem.matricule || 'Sans matricule'}</p>
+                                    </div>
+                                    <Badge variant={statusVariant[selectedItem.status]}>{statusMap[selectedItem.status]}</Badge>
+                                </div>
+                                <div className="p-6">
+                                    <div className="grid grid-cols-2 gap-6 mb-6">
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Photo de reference CPPF</p>
+                                            <div className="aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border-2 border-gray-200 flex items-center justify-center">
+                                                {selectedItem.photoRef ? (
+                                                    <img src={selectedItem.photoRef} alt="Reference" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="text-center p-4">
+                                                        <Icons.Camera />
+                                                        <p className="text-xs text-gray-400 mt-2">Pas de photo</p>
+                                                        <label className="mt-2 inline-block cursor-pointer text-xs text-blue-600 hover:text-blue-800">
+                                                            {uploadingRef === selectedItem.id ? 'Upload...' : 'Uploader'}
+                                                            <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files[0] && handlePhotoUpload(e.target.files[0], selectedItem.id, 'reference')} />
+                                                        </label>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Selfie recu du retraite</p>
+                                            <div className="aspect-[3/4] bg-gray-100 rounded-xl overflow-hidden border-2 border-gray-200 flex items-center justify-center">
+                                                {selectedItem.photoSelfie ? (
+                                                    <img src={selectedItem.photoSelfie} alt="Selfie" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="text-center p-4">
+                                                        <Icons.Camera />
+                                                        <p className="text-xs text-gray-400 mt-2">Pas de selfie</p>
+                                                        <label className="mt-2 inline-block cursor-pointer text-xs text-blue-600 hover:text-blue-800">
+                                                            {uploadingSelfie === selectedItem.id ? 'Upload...' : 'Uploader selfie'}
+                                                            <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files[0] && handlePhotoUpload(e.target.files[0], selectedItem.id, 'selfie')} />
+                                                        </label>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {selectedItem.similarity != null && (
+                                        <div className="mb-4 p-3 bg-gray-50 rounded-lg text-center">
+                                            <span className="text-xs text-gray-500">Score IA : </span>
+                                            <span className={`text-lg font-bold ${selectedItem.similarity >= 75 ? 'text-green-600' : selectedItem.similarity >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                {selectedItem.similarity.toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div className="text-xs text-gray-400 mb-4 text-center">
+                                        Mode: {modeMap[selectedItem.mode] || selectedItem.mode} — {selectedItem.date ? new Date(selectedItem.date).toLocaleString('fr-FR') : '—'}
+                                        {selectedItem.validatedBy && <span> — Valide par {selectedItem.validatedBy}</span>}
+                                    </div>
+                                    {selectedItem.status === 'PENDING_REVIEW' && (
+                                        <div className="flex gap-3">
+                                            <button className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors disabled:opacity-50" onClick={() => handleValidate(selectedItem.id, 'VALIDATED')} disabled={validating}>
+                                                Valider l'identite
+                                            </button>
+                                            <button className="flex-1 py-3 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-colors disabled:opacity-50" onClick={() => handleValidate(selectedItem.id, 'REJECTED')} disabled={validating}>
+                                                Refuser
+                                            </button>
+                                        </div>
+                                    )}
+                                    {selectedItem.status !== 'PENDING_REVIEW' && (
+                                        <div className="flex justify-center">
+                                            <button className="px-6 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50" onClick={() => setSelectedItem(null)}>Fermer</button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <Card>
                         <div className="flex items-center justify-between mb-4">
@@ -3848,7 +3976,7 @@
                             <div className="text-center py-12 text-gray-400">
                                 <Icons.Camera />
                                 <p className="mt-3 text-sm">Aucune preuve de vie recue</p>
-                                <p className="text-xs text-gray-400 mt-1">Les verifications apparaitront ici lorsque les retraites effectueront leur preuve de vie via WhatsApp.</p>
+                                <p className="text-xs text-gray-400 mt-1">Cliquez "Donnees demo" pour generer des exemples de test.</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -3857,26 +3985,33 @@
                                         <tr className="border-b border-gray-100">
                                             <th className="text-left py-3 px-3 font-medium text-gray-500">Retraite</th>
                                             <th className="text-left py-3 px-3 font-medium text-gray-500">Matricule</th>
-                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Telephone</th>
+                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Mode</th>
                                             <th className="text-left py-3 px-3 font-medium text-gray-500">Statut</th>
                                             <th className="text-left py-3 px-3 font-medium text-gray-500">Similarite</th>
                                             <th className="text-left py-3 px-3 font-medium text-gray-500">Date</th>
-                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Appareil</th>
+                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {filtered.map(r => (
-                                            <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50">
+                                            <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedItem(r)}>
                                                 <td className="py-3 px-3">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
                                                             {(r.name || '??').split(' ').slice(0,2).map(n => n[0]).join('')}
                                                         </div>
-                                                        <span className="font-medium text-gray-900">{r.name}</span>
+                                                        <div>
+                                                            <span className="font-medium text-gray-900">{r.name}</span>
+                                                            <p className="text-xs text-gray-400">{r.phone}</p>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td className="py-3 px-3 text-gray-600 font-mono text-xs">{r.matricule || '—'}</td>
-                                                <td className="py-3 px-3 text-gray-600">{r.phone}</td>
+                                                <td className="py-3 px-3">
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${r.mode === 'api' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                                                        {r.mode === 'api' ? 'IA' : 'Manuel'}
+                                                    </span>
+                                                </td>
                                                 <td className="py-3 px-3">
                                                     <Badge variant={statusVariant[r.status] || 'default'}>{statusMap[r.status] || r.status}</Badge>
                                                 </td>
@@ -3888,7 +4023,15 @@
                                                     ) : '—'}
                                                 </td>
                                                 <td className="py-3 px-3 text-gray-500 text-xs">{r.date ? new Date(r.date).toLocaleString('fr-FR') : '—'}</td>
-                                                <td className="py-3 px-3 text-gray-400 text-xs">{r.device || '—'}</td>
+                                                <td className="py-3 px-3">
+                                                    {r.status === 'PENDING_REVIEW' ? (
+                                                        <span className="text-xs text-amber-600 font-semibold">A verifier</span>
+                                                    ) : r.validatedBy ? (
+                                                        <span className="text-xs text-gray-400">{r.validatedBy}</span>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">—</span>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
