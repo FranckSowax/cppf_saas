@@ -235,19 +235,26 @@ app.post('/api/preuve-de-vie/send-link', async (req, res) => {
     const attrs = contact.customAttributes || {};
     const photoRef = attrs.preuveDeVie?.photoRef || '';
 
-    const params = new URLSearchParams({
+    // Construire les parametres URL pour le bouton dynamique
+    const urlParams = new URLSearchParams({
       nom: contact.name || '',
       matricule: contact.matricule || '',
       photo_ref: photoRef,
       token: contact.id
-    });
+    }).toString();
 
-    const link = `https://${domain}/preuve-de-vie?${params.toString()}`;
+    // Envoyer via le template APPROVED cppf_preuve_de_vie (UTILITY)
+    // Le template a: HEADER TEXT, BODY avec {{1}}=nom, BUTTON URL avec {{1}}=data params
+    const components = [
+      { type: 'body', parameters: [{ type: 'text', text: contact.name || 'cher assure' }] },
+      { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: urlParams }] }
+    ];
 
-    // Envoyer via WhatsApp (message simple avec lien)
-    const result = await whatsappService.sendMessage(contact.phone,
-      `Bonjour ${contact.name || 'cher assure'},\n\nVotre preuve de vie est a effectuer. Cliquez sur le lien ci-dessous pour verifier votre identite en quelques secondes :\n\n${link}\n\n— CPPF`
+    const result = await whatsappService.sendTemplate(
+      contact.phone, 'cppf_preuve_de_vie', 'fr', components
     );
+
+    logger.info('Preuve de vie template sent', { contactId, phone: contact.phone, success: result.success, error: result.error });
 
     // Marquer comme en attente
     if (!attrs.preuveDeVie) attrs.preuveDeVie = {};
