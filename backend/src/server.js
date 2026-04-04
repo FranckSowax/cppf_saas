@@ -265,7 +265,7 @@ app.post('/api/preuve-de-vie/send-link', async (req, res) => {
 
     await prisma.$disconnect();
     logger.info('Preuve de vie link sent', { contactId, phone: contact.phone });
-    res.json({ success: result.success, link, messageId: result.messageId });
+    res.json({ success: result.success, messageId: result.messageId, error: result.error });
   } catch (err) {
     logger.error('Send preuve de vie link error', { error: err.message });
     res.status(500).json({ error: err.message });
