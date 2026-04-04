@@ -551,6 +551,57 @@ router.post('/whatsapp/recreate-as-utility', async (req, res) => {
 });
 
 // ============================================
+// POST /webhooks/whatsapp/create-preuve-de-vie-template - Create the Meta template for preuve de vie
+// ============================================
+router.post('/whatsapp/create-preuve-de-vie-template', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Token requis' });
+
+    const domain = process.env.RAILWAY_PUBLIC_DOMAIN || 'cppfsaas-production.up.railway.app';
+
+    // Create Meta template with dynamic URL button
+    const metaResult = await whatsappService.createTemplate({
+      name: 'cppf_preuve_de_vie',
+      category: 'utility',
+      content: 'Bonjour {{1}}, votre certificat de vie arrive a echeance. Effectuez votre preuve de vie en ligne en quelques secondes via le lien ci-dessous.',
+      language: 'fr',
+      headerType: 'TEXT',
+      headerContent: 'Preuve de Vie CPPF',
+      buttons: [
+        { type: 'URL', text: 'Verifier mon identite', url: `https://${domain}/preuve-de-vie?data={{1}}` }
+      ],
+      footer: 'CPPF - Caisse des Pensions et des Prestations Familiales'
+    });
+
+    if (metaResult.success) {
+      // Also create in DB
+      await prisma.template.create({
+        data: {
+          name: 'cppf_preuve_de_vie',
+          displayName: 'Preuve de Vie Digitale',
+          category: 'UTILITY',
+          content: 'Bonjour {{1}}, votre certificat de vie arrive a echeance. Effectuez votre preuve de vie en ligne en quelques secondes via le lien ci-dessous.',
+          variables: ['nom'],
+          language: 'fr',
+          headerType: 'TEXT',
+          headerContent: 'Preuve de Vie CPPF',
+          buttons: [{ type: 'URL', text: 'Verifier mon identite', url: `https://${domain}/preuve-de-vie?data={{1}}`, redirectUrl: `https://${domain}/preuve-de-vie` }],
+          footer: 'CPPF - Caisse des Pensions et des Prestations Familiales',
+          status: 'PENDING',
+          metaId: metaResult.templateId
+        }
+      });
+    }
+
+    res.json({ success: metaResult.success, metaId: metaResult.templateId, error: metaResult.error, details: metaResult.details });
+  } catch (error) {
+    logger.error('Error creating preuve de vie template', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
 // POST /webhooks/whatsapp/enable-tracking - Recreate templates on Meta with dynamic tracking URLs
 // Deletes from Meta, recreates with /t/{{1}} buttons, updates DB
 // ============================================

@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CPPF — Preuve de Vie</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cppf-primary: #0B4D2C;
+  --cppf-primary-light: #0F6B3D;
+  --cppf-accent: #D4A017;
+  --cppf-accent-light: #F5D76E;
+  --cppf-bg: #F7F5F0;
+  --cppf-card: #FFFFFF;
+  --cppf-text: #1A1A1A;
+  --cppf-text-muted: #6B6B6B;
+  --cppf-success: #0A8043;
+  --cppf-danger: #C62828;
+  --cppf-warning: #E67E22;
+  --cppf-border: rgba(0,0,0,0.08);
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  background: var(--cppf-bg);
+  color: var(--cppf-text);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+/* ─── HEADER ─── */
+.header {
+  background: linear-gradient(135deg, var(--cppf-primary) 0%, var(--cppf-primary-light) 100%);
+  padding: 20px 20px 28px;
+  position: relative;
+  overflow: hidden;
+}
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0; right: 0;
+  height: 20px;
+  background: var(--cppf-bg);
+  border-radius: 20px 20px 0 0;
+}
+.header-pattern {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at 80% 20%, rgba(212,160,23,0.15) 0%, transparent 50%),
+              radial-gradient(circle at 20% 80%, rgba(255,255,255,0.05) 0%, transparent 40%);
+}
+.header-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.logo-badge {
+  width: 52px;
+  height: 52px;
+  background: rgba(255,255,255,0.15);
+  border: 1.5px solid rgba(255,255,255,0.25);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Serif Display', serif;
+  font-size: 18px;
+  color: var(--cppf-accent-light);
+  font-weight: 400;
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+.header-text h1 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.3px;
+}
+.header-text p {
+  font-size: 12.5px;
+  color: rgba(255,255,255,0.7);
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+/* ─── MAIN ─── */
+.main {
+  flex: 1;
+  padding: 0 16px 24px;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ─── USER CARD ─── */
+.user-card {
+  background: var(--cppf-card);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-top: -6px;
+  border: 1px solid var(--cppf-border);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.user-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.user-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--cppf-primary), var(--cppf-primary-light));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  letter-spacing: -0.5px;
+}
+.user-info h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--cppf-text);
+  letter-spacing: -0.2px;
+}
+.user-info .matricule {
+  font-size: 12.5px;
+  color: var(--cppf-text-muted);
+  margin-top: 2px;
+}
+.user-info .matricule span {
+  font-weight: 600;
+  color: var(--cppf-primary);
+}
+.date-badge {
+  margin-left: auto;
+  background: rgba(11,77,44,0.06);
+  color: var(--cppf-primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ─── STEPS INDICATOR ─── */
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 24px 0 20px;
+  padding: 0 4px;
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.step-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all 0.4s ease;
+  background: rgba(0,0,0,0.06);
+  color: var(--cppf-text-muted);
+}
+.step-dot.active {
+  background: var(--cppf-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(11,77,44,0.3);
+}
+.step-dot.done {
+  background: var(--cppf-success);
+  color: #fff;
+}
+.step-line {
+  flex: 1;
+  height: 2px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 2px;
+  transition: background 0.4s ease;
+}
+.step-line.done { background: var(--cppf-success); }
+
+/* ─── CAMERA SECTION ─── */
+.camera-section {
+  background: var(--cppf-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--cppf-border);
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.camera-title {
+  padding: 16px 20px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cppf-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.camera-title svg {
+  width: 18px;
+  height: 18px;
+  color: var(--cppf-primary);
+}
+.camera-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3/4;
+  background: #111;
+  overflow: hidden;
+}
+.camera-container video,
+.camera-container canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.camera-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.face-guide {
+  width: 200px;
+  height: 260px;
+  border: 2.5px dashed rgba(255,255,255,0.5);
+  border-radius: 50%;
+  position: relative;
+}
+.face-guide::after {
+  content: 'Placez votre visage ici';
+  position: absolute;
+  bottom: -36px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 13px;
+  color: rgba(255,255,255,0.8);
+  font-weight: 500;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(180deg, #1a1a1a, #111);
+  color: rgba(255,255,255,0.6);
+  font-size: 14px;
+}
+.camera-placeholder svg {
+  width: 48px;
+  height: 48px;
+  opacity: 0.4;
+}
+.captured-photo {
+  position: absolute;
+  inset: 0;
+}
+.captured-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ─── BUTTONS ─── */
+.camera-actions {
+  padding: 16px 20px 20px;
+  display: flex;
+  gap: 10px;
+}
+.btn {
+  flex: 1;
+  padding: 14px 20px;
+  border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  letter-spacing: -0.1px;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary {
+  background: var(--cppf-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(11,77,44,0.25);
+}
+.btn-primary:hover { background: var(--cppf-primary-light); }
+.btn-primary:disabled {
+  background: rgba(0,0,0,0.12);
+  color: rgba(0,0,0,0.35);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.btn-outline {
+  background: transparent;
+  color: var(--cppf-text-muted);
+  border: 1.5px solid rgba(0,0,0,0.12);
+}
+.btn-outline:hover { border-color: rgba(0,0,0,0.2); }
+.btn svg { width: 18px; height: 18px; }
+
+/* ─── RESULT SECTION ─── */
+.result-section {
+  margin-top: 16px;
+  animation: slideUp 0.5s ease;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.result-card {
+  background: var(--cppf-card);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  text-align: center;
+  border: 1px solid var(--cppf-border);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.result-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+.result-icon.success { background: rgba(10,128,67,0.1); color: var(--cppf-success); }
+.result-icon.danger { background: rgba(198,40,40,0.1); color: var(--cppf-danger); }
+.result-icon.warning { background: rgba(230,126,34,0.1); color: var(--cppf-warning); }
+.result-icon svg { width: 32px; height: 32px; }
+.result-card h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: -0.3px;
+}
+.result-card h3.success { color: var(--cppf-success); }
+.result-card h3.danger { color: var(--cppf-danger); }
+.result-card h3.warning { color: var(--cppf-warning); }
+.result-card p {
+  font-size: 13.5px;
+  color: var(--cppf-text-muted);
+  line-height: 1.6;
+  max-width: 300px;
+  margin: 0 auto;
+}
+.result-meta {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--cppf-border);
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  font-size: 12px;
+  color: var(--cppf-text-muted);
+}
+.result-meta span { font-weight: 600; color: var(--cppf-text); }
+
+/* ─── LOADING ─── */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+}
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: var(--cppf-accent-light);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  color: rgba(255,255,255,0.85);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ─── INSTRUCTIONS ─── */
+.instructions {
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: rgba(11,77,44,0.04);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--cppf-primary);
+}
+.instructions p {
+  font-size: 12.5px;
+  color: var(--cppf-text-muted);
+  line-height: 1.6;
+}
+.instructions strong {
+  color: var(--cppf-text);
+  font-weight: 600;
+}
+
+/* ─── FOOTER ─── */
+.footer {
+  padding: 16px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--cppf-text-muted);
+  line-height: 1.5;
+}
+.footer a {
+  color: var(--cppf-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* ─── HIDDEN ─── */
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-pattern"></div>
+  <div class="header-content">
+    <div class="logo-badge">CPPF</div>
+    <div class="header-text">
+      <h1>Preuve de Vie Digitale</h1>
+      <p>Caisse de Pensions et Prestations Familiales</p>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- User Card -->
+  <div class="user-card">
+    <div class="user-card-header">
+      <div class="user-avatar" id="userInitials">--</div>
+      <div class="user-info">
+        <h2 id="userName">Chargement...</h2>
+        <div class="matricule">Matricule : <span id="userMatricule">---</span></div>
+      </div>
+      <div class="date-badge" id="dateToday">--/--</div>
+    </div>
+  </div>
+
+  <!-- Steps -->
+  <div class="steps">
+    <div class="step-item">
+      <div class="step-dot active" id="step1">1</div>
+    </div>
+    <div class="step-line" id="line1"></div>
+    <div class="step-item">
+      <div class="step-dot" id="step2">2</div>
+    </div>
+    <div class="step-line" id="line2"></div>
+    <div class="step-item">
+      <div class="step-dot" id="step3">3</div>
+    </div>
+  </div>
+
+  <!-- Camera Section -->
+  <div class="camera-section" id="cameraSection">
+    <div class="camera-title">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <span id="cameraStepLabel">Étape 1 — Prenez un selfie</span>
+    </div>
+    <div class="camera-container" id="cameraContainer">
+      <!-- Placeholder before camera -->
+      <div class="camera-placeholder" id="cameraPlaceholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>Appuyez pour activer la caméra</span>
+      </div>
+      <!-- Live video -->
+      <video id="videoFeed" autoplay playsinline class="hidden" style="transform: scaleX(-1);"></video>
+      <!-- Face guide overlay -->
+      <div class="camera-overlay hidden" id="faceGuide">
+        <div class="face-guide"></div>
+      </div>
+      <!-- Captured photo -->
+      <div class="captured-photo hidden" id="capturedPhoto">
+        <img id="capturedImg" src="" alt="Selfie capturé">
+      </div>
+      <!-- Loading overlay -->
+      <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Vérification en cours...</div>
+      </div>
+      <!-- Hidden canvas for capture -->
+      <canvas id="captureCanvas" class="hidden"></canvas>
+    </div>
+    <div class="camera-actions">
+      <button class="btn btn-primary" id="btnStartCamera" onclick="startCamera()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Activer la caméra
+      </button>
+      <button class="btn btn-primary hidden" id="btnCapture" onclick="capturePhoto()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+        Prendre la photo
+      </button>
+      <button class="btn btn-outline hidden" id="btnRetake" onclick="retakePhoto()">
+        Reprendre
+      </button>
+      <button class="btn btn-primary hidden" id="btnSubmit" onclick="submitPhoto()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Envoyer
+      </button>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="instructions" id="instructions">
+    <p>
+      <strong>Instructions :</strong> Regardez la caméra bien en face, dans un endroit bien éclairé. 
+      Retirez vos lunettes de soleil et chapeaux. Votre visage doit être entièrement visible.
+    </p>
+  </div>
+
+  <!-- Result Section (hidden by default) -->
+  <div class="result-section hidden" id="resultSection"></div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  Système sécurisé — CPPF Gabon<br>
+  En cas de difficulté, contactez le <a href="tel:+24101000000">01 00 00 00</a>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIGURATION
+// ═══════════════════════════════════════════════════════
+const CONFIG = {
+  RAPIDAPI_KEY: '71062435d0mshd94e40817d37670p12b543jsn532d6e690964',
+  RAPIDAPI_HOST: 'faceanalyzer-ai.p.rapidapi.com',
+  COMPARE_URL: 'https://faceanalyzer-ai.p.rapidapi.com/compare-faces',
+  // SEUIL de similarité minimum (à ajuster selon les besoins CPPF)
+  SIMILARITY_THRESHOLD: 75,
+};
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let currentStream = null;
+let capturedBlob = null;
+let retireeData = null;
+
+// ═══════════════════════════════════════════════════════
+// INITIALISATION
+// ═══════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // Extraire les paramètres URL
+  // Format attendu: ?nom=NDONG+OBAME+Jean&matricule=CPF-2024-00145&photo_ref=https://...
+  const params = new URLSearchParams(window.location.search);
+  
+  retireeData = {
+    nom: params.get('nom') || 'NDONG OBAME Jean-Pierre',
+    matricule: params.get('matricule') || 'CPF-2024-00145',
+    photo_ref: params.get('photo_ref') || '',
+    token: params.get('token') || '',
+  };
+
+  // Affichage des infos
+  document.getElementById('userName').textContent = retireeData.nom;
+  document.getElementById('userMatricule').textContent = retireeData.matricule;
+  
+  const initials = retireeData.nom.split(' ').slice(0, 2).map(n => n[0]).join('');
+  document.getElementById('userInitials').textContent = initials;
+
+  // Date du jour
+  const now = new Date();
+  const options = { day: '2-digit', month: 'short' };
+  document.getElementById('dateToday').innerHTML = 
+    now.toLocaleDateString('fr-FR', options) + '<br>' + now.getFullYear();
+});
+
+// ═══════════════════════════════════════════════════════
+// GESTION DE LA CAMÉRA
+// ═══════════════════════════════════════════════════════
+async function startCamera() {
+  try {
+    const constraints = {
+      video: {
+        facingMode: 'user',     // Caméra frontale
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+      },
+      audio: false
+    };
+
+    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+    
+    const video = document.getElementById('videoFeed');
+    video.srcObject = currentStream;
+    video.classList.remove('hidden');
+
+    document.getElementById('cameraPlaceholder').classList.add('hidden');
+    document.getElementById('faceGuide').classList.remove('hidden');
+    document.getElementById('btnStartCamera').classList.add('hidden');
+    document.getElementById('btnCapture').classList.remove('hidden');
+    
+    updateStep(1);
+  } catch (err) {
+    alert('Impossible d\'accéder à la caméra. Veuillez autoriser l\'accès dans les paramètres de votre navigateur.');
+    console.error('Camera error:', err);
+  }
+}
+
+function capturePhoto() {
+  const video = document.getElementById('videoFeed');
+  const canvas = document.getElementById('captureCanvas');
+  
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  
+  const ctx = canvas.getContext('2d');
+  // Mirror flip pour correspondre à l'affichage
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0);
+  
+  // Convertir en blob
+  canvas.toBlob((blob) => {
+    capturedBlob = blob;
+    const url = URL.createObjectURL(blob);
+    
+    document.getElementById('capturedImg').src = url;
+    document.getElementById('capturedPhoto').classList.remove('hidden');
+    document.getElementById('videoFeed').classList.add('hidden');
+    document.getElementById('faceGuide').classList.add('hidden');
+    
+    // Boutons
+    document.getElementById('btnCapture').classList.add('hidden');
+    document.getElementById('btnRetake').classList.remove('hidden');
+    document.getElementById('btnSubmit').classList.remove('hidden');
+    
+    document.getElementById('cameraStepLabel').textContent = 'Étape 2 — Vérifiez votre photo';
+    updateStep(2);
+    
+    // Stopper la caméra
+    stopCamera();
+  }, 'image/jpeg', 0.85);
+}
+
+function retakePhoto() {
+  capturedBlob = null;
+  document.getElementById('capturedPhoto').classList.add('hidden');
+  document.getElementById('btnRetake').classList.add('hidden');
+  document.getElementById('btnSubmit').classList.add('hidden');
+  document.getElementById('btnStartCamera').classList.remove('hidden');
+  document.getElementById('cameraStepLabel').textContent = 'Étape 1 — Prenez un selfie';
+  updateStep(1);
+  startCamera();
+}
+
+function stopCamera() {
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => track.stop());
+    currentStream = null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// ENVOI ET COMPARAISON
+// ═══════════════════════════════════════════════════════
+async function submitPhoto() {
+  if (!capturedBlob) return;
+
+  // UI loading
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+  document.getElementById('btnSubmit').disabled = true;
+  document.getElementById('btnRetake').disabled = true;
+  document.getElementById('cameraStepLabel').textContent = 'Étape 3 — Analyse en cours...';
+
+  try {
+    // ─── Préparer le FormData ───
+    const formData = new FormData();
+    
+    // Source = photo de référence CPPF (URL depuis la base de données)
+    // Target = selfie capturé par le retraité
+    if (retireeData.photo_ref) {
+      formData.append('source_image_url', retireeData.photo_ref);
+    } else {
+      // Mode démo : utiliser une image test
+      formData.append('source_image_url', 'https://openmediadata.s3.eu-west-3.amazonaws.com/face.jpg');
+    }
+    
+    formData.append('target_image', capturedBlob, 'selfie.jpg');
+
+    // ─── Appel API FaceAnalyzer ───
+    const response = await fetch(CONFIG.COMPARE_URL, {
+      method: 'POST',
+      headers: {
+        'x-rapidapi-key': CONFIG.RAPIDAPI_KEY,
+        'x-rapidapi-host': CONFIG.RAPIDAPI_HOST,
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    console.log('API Response:', data);
+
+    // ─── Traiter le résultat ───
+    processResult(data);
+
+  } catch (error) {
+    console.error('API Error:', error);
+    showResult('error', {
+      title: 'Erreur technique',
+      message: 'La vérification n\'a pas pu aboutir. Veuillez réessayer ou contacter la CPPF.',
+      type: 'warning',
+    });
+  } finally {
+    document.getElementById('loadingOverlay').classList.add('hidden');
+  }
+}
+
+function processResult(data) {
+  const timestamp = new Date().toLocaleString('fr-FR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  if (data.statusCode !== 200) {
+    showResult('warning', {
+      title: 'Vérification impossible',
+      message: 'Aucun visage détecté ou image illisible. Veuillez reprendre la photo dans de meilleures conditions.',
+      timestamp,
+    });
+    return;
+  }
+
+  const hasMatch = data.matchedFaces && data.matchedFaces.length > 0;
+  const hasUnmatched = data.unmatchedFaces && data.unmatchedFaces.length > 0;
+
+  if (hasMatch) {
+    // ✅ IDENTITÉ CONFIRMÉE
+    showResult('success', {
+      title: 'Identité confirmée',
+      message: `Votre preuve de vie a été validée avec succès. Aucune action supplémentaire n'est requise.`,
+      timestamp,
+      matricule: retireeData.matricule,
+    });
+    // TODO: Envoyer le statut au backend CPPF + webhook WhatsApp confirmation
+    notifyCPPFBackend('VALIDATED', data);
+
+  } else if (hasUnmatched) {
+    // ❌ NON RECONNU
+    showResult('danger', {
+      title: 'Identité non confirmée',
+      message: 'Le visage capturé ne correspond pas à votre photo de référence. Veuillez réessayer ou vous présenter en agence CPPF.',
+      timestamp,
+      matricule: retireeData.matricule,
+    });
+    notifyCPPFBackend('REJECTED', data);
+
+  } else {
+    // ⚠️ À VÉRIFIER
+    showResult('warning', {
+      title: 'Vérification manuelle requise',
+      message: 'Le système n\'a pas pu déterminer une correspondance fiable. Un agent CPPF vous contactera sous 24h.',
+      timestamp,
+      matricule: retireeData.matricule,
+    });
+    notifyCPPFBackend('PENDING_REVIEW', data);
+  }
+
+  updateStep(3);
+}
+
+// ═══════════════════════════════════════════════════════
+// AFFICHAGE DES RÉSULTATS
+// ═══════════════════════════════════════════════════════
+function showResult(type, info) {
+  const icons = {
+    success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    danger: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  };
+
+  const section = document.getElementById('resultSection');
+  section.classList.remove('hidden');
+  document.getElementById('instructions').classList.add('hidden');
+  document.getElementById('cameraStepLabel').textContent = 'Vérification terminée';
+
+  section.innerHTML = `
+    <div class="result-card">
+      <div class="result-icon ${type}">${icons[type]}</div>
+      <h3 class="${type}">${info.title}</h3>
+      <p>${info.message}</p>
+      ${info.timestamp ? `
+      <div class="result-meta">
+        <div>Date <span>${info.timestamp}</span></div>
+        ${info.matricule ? `<div>Matricule <span>${info.matricule}</span></div>` : ''}
+      </div>` : ''}
+    </div>
+    ${type !== 'success' ? `
+    <button class="btn btn-primary" style="width:100%; margin-top:12px;" onclick="resetFlow()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      Réessayer
+    </button>` : ''}
+  `;
+
+  // Scroll vers le résultat
+  section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ═══════════════════════════════════════════════════════
+// NOTIFICATION BACKEND CPPF
+// ═══════════════════════════════════════════════════════
+async function notifyCPPFBackend(status, apiResponse) {
+  const payload = {
+    matricule: retireeData.matricule,
+    nom: retireeData.nom,
+    status: status,
+    timestamp: new Date().toISOString(),
+    token: retireeData.token,
+    similarity: apiResponse.matchedFaces?.[0]?.similarity || apiResponse.unmatchedFaces?.[0]?.similarity || null,
+    device_info: {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+    }
+  };
+
+  console.log('Notification CPPF Backend:', payload);
+
+  try {
+    const backendUrl = window.location.origin + '/api/preuve-de-vie/result';
+    const resp = await fetch(backendUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await resp.json();
+    console.log('Backend response:', result);
+  } catch (err) {
+    console.error('Backend notification error:', err);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// UTILITAIRES
+// ═══════════════════════════════════════════════════════
+function updateStep(step) {
+  const steps = [
+    document.getElementById('step1'),
+    document.getElementById('step2'),
+    document.getElementById('step3'),
+  ];
+  const lines = [
+    document.getElementById('line1'),
+    document.getElementById('line2'),
+  ];
+
+  steps.forEach((s, i) => {
+    s.className = 'step-dot';
+    if (i + 1 < step) s.classList.add('done');
+    else if (i + 1 === step) s.classList.add('active');
+  });
+
+  lines.forEach((l, i) => {
+    l.className = 'step-line';
+    if (i + 1 < step) l.classList.add('done');
+  });
+
+  // Check mark for completed steps
+  steps.forEach((s, i) => {
+    if (i + 1 < step) {
+      s.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    } else {
+      s.textContent = i + 1;
+    }
+  });
+}
+
+function resetFlow() {
+  capturedBlob = null;
+  document.getElementById('capturedPhoto').classList.add('hidden');
+  document.getElementById('cameraPlaceholder').classList.remove('hidden');
+  document.getElementById('resultSection').classList.add('hidden');
+  document.getElementById('resultSection').innerHTML = '';
+  document.getElementById('instructions').classList.remove('hidden');
+  
+  document.getElementById('btnStartCamera').classList.remove('hidden');
+  document.getElementById('btnCapture').classList.add('hidden');
+  document.getElementById('btnRetake').classList.add('hidden');
+  document.getElementById('btnSubmit').classList.add('hidden');
+  document.getElementById('btnSubmit').disabled = false;
+  document.getElementById('btnRetake').disabled = false;
+  
+  document.getElementById('cameraStepLabel').textContent = 'Étape 1 — Prenez un selfie';
+  updateStep(1);
+}
+</script>
+</body>
+</html>

@@ -95,6 +95,67 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 // ============================================
+// Preuve de vie: servir la page et recevoir les resultats
+// ============================================
+app.get('/preuve-de-vie', (req, res) => {
+  res.sendFile(path.join(rootDir, 'public', 'preuve-de-vie.html'));
+});
+
+app.post('/api/preuve-de-vie/result', async (req, res) => {
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    const { matricule, nom, status, timestamp, token, similarity, device_info } = req.body;
+
+    logger.info('Preuve de vie result received', { matricule, nom, status, similarity });
+
+    // Stocker le resultat dans la table contact (champ customAttributes)
+    if (matricule) {
+      const contact = await prisma.contact.findFirst({
+        where: { OR: [{ matricule }, { name: { contains: nom?.split(' ')[0] || '', mode: 'insensitive' } }] }
+      });
+
+      if (contact) {
+        const attrs = contact.customAttributes || {};
+        attrs.preuveDeVie = {
+          status,
+          date: timestamp || new Date().toISOString(),
+          similarity,
+          device: device_info?.platform || 'unknown'
+        };
+
+        await prisma.contact.update({
+          where: { id: contact.id },
+          data: {
+            customAttributes: attrs,
+            dernierCertificatVie: status === 'VALIDATED' ? new Date() : contact.dernierCertificatVie
+          }
+        });
+
+        logger.info('Preuve de vie saved for contact', { contactId: contact.id, status });
+      }
+    }
+
+    // Envoyer une confirmation WhatsApp au retraite
+    if (status === 'VALIDATED' && matricule) {
+      const contact = await prisma.contact.findFirst({ where: { matricule } });
+      if (contact?.phone) {
+        const whatsappService = require('./services/whatsapp');
+        await whatsappService.sendMessage(contact.phone,
+          `Votre preuve de vie a ete validee avec succes le ${new Date().toLocaleDateString('fr-FR')}. Aucune action supplementaire n'est requise. — CPPF`
+        );
+      }
+    }
+
+    await prisma.$disconnect();
+    res.json({ success: true, status, matricule });
+  } catch (err) {
+    logger.error('Preuve de vie result error', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
 // Tracking redirect: GET /t/:trackingId/:buttonIndex?
 // Enregistre le clic sur un bouton puis redirige vers l'URL cible
 // Supporte multi-boutons (0, 1, 2)
