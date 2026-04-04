@@ -155,6 +155,46 @@ app.post('/api/preuve-de-vie/result', async (req, res) => {
   }
 });
 
+// GET /api/preuve-de-vie/list - Liste des preuves de vie recues
+app.get('/api/preuve-de-vie/list', async (req, res) => {
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+
+    // Trouver tous les contacts qui ont une preuveDeVie dans customAttributes
+    const contacts = await prisma.contact.findMany({
+      where: { NOT: { customAttributes: { equals: {} } } },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true, name: true, phone: true, matricule: true, category: true,
+        dernierCertificatVie: true, customAttributes: true, updatedAt: true
+      }
+    });
+
+    // Filtrer ceux qui ont effectivement une preuveDeVie
+    const results = contacts
+      .filter(c => c.customAttributes?.preuveDeVie)
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        matricule: c.matricule,
+        category: c.category,
+        status: c.customAttributes.preuveDeVie.status,
+        date: c.customAttributes.preuveDeVie.date,
+        similarity: c.customAttributes.preuveDeVie.similarity,
+        device: c.customAttributes.preuveDeVie.device,
+        dernierCertificatVie: c.dernierCertificatVie
+      }));
+
+    await prisma.$disconnect();
+    res.json({ data: results, total: results.length });
+  } catch (err) {
+    logger.error('Error listing preuve de vie', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============================================
 // Tracking redirect: GET /t/:trackingId/:buttonIndex?
 // Enregistre le clic sur un bouton puis redirige vers l'URL cible

@@ -160,6 +160,7 @@
             Phone: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
             Mail: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
             Calendar: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+            Camera: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
             RefreshCw: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
             Copy: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
             LogOut: () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
@@ -278,7 +279,7 @@
             const [user, setUser] = useState(authStore.getUser());
             const getTabFromPath = () => {
                 const path = window.location.pathname.replace(/^\/+/, '') || 'dashboard';
-                const valid = ['dashboard','campaigns','segments','chatbot','conversations','contacts','templates','analytics','settings'];
+                const valid = ['dashboard','campaigns','segments','chatbot','conversations','contacts','templates','preuve-de-vie','analytics','settings'];
                 return valid.includes(path) ? path : 'dashboard';
             };
             const [activeTab, setActiveTabState] = useState(getTabFromPath());
@@ -305,6 +306,7 @@
                 { id: 'segments', label: 'Segments', icon: Icons.Layers },
                 { id: 'contacts', label: 'Contacts', icon: Icons.Users },
                 { id: 'templates', label: 'Templates', icon: Icons.FileText },
+                { id: 'preuve-de-vie', label: 'Preuve de Vie', icon: Icons.Camera },
                 { id: 'chatbot', label: 'Chatbot RAG', icon: Icons.Bot },
                 { id: 'conversations', label: 'Conversations', icon: Icons.MessageSquare },
                 { id: 'analytics', label: 'Analytics', icon: Icons.BarChart3 },
@@ -320,6 +322,7 @@
                     case 'conversations': return <ConversationsView />;
                     case 'contacts': return <ContactsView />;
                     case 'templates': return <TemplatesView />;
+                    case 'preuve-de-vie': return <PreuveDeVieView />;
                     case 'analytics': return <AnalyticsView />;
                     case 'settings': return <SettingsView />;
                     default: return <DashboardView onNavigate={setActiveTab} />;
@@ -3779,6 +3782,124 @@
         };
 
         // =============================================
+        // =============================================
+        // Preuve de Vie View
+        // =============================================
+        const PreuveDeVieView = () => {
+            const { data, loading, error, refetch } = useApi('/preuve-de-vie/list');
+            const [statusFilter, setStatusFilter] = useState('');
+
+            if (loading) return <Spinner />;
+            if (error) return <ErrorBox message={error} onRetry={refetch} />;
+
+            const results = data?.data || [];
+            const filtered = statusFilter ? results.filter(r => r.status === statusFilter) : results;
+
+            const stats = {
+                total: results.length,
+                validated: results.filter(r => r.status === 'VALIDATED').length,
+                rejected: results.filter(r => r.status === 'REJECTED').length,
+                pending: results.filter(r => r.status === 'PENDING_REVIEW').length,
+            };
+
+            const statusMap = { VALIDATED: 'Valide', REJECTED: 'Refuse', PENDING_REVIEW: 'En attente' };
+            const statusVariant = { VALIDATED: 'success', REJECTED: 'danger', PENDING_REVIEW: 'warning' };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Preuve de Vie</h1>
+                            <p className="text-sm text-gray-500 mt-1">Verification d'identite biometrique des retraites</p>
+                        </div>
+                        <Button icon={Icons.Download} onClick={refetch}>Actualiser</Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <Card className="text-center cursor-pointer" onClick={() => setStatusFilter('')}>
+                            <p className="text-2xl font-bold text-blue-700">{stats.total}</p>
+                            <p className="text-xs text-gray-500 mt-1">Total</p>
+                        </Card>
+                        <Card className="text-center cursor-pointer" onClick={() => setStatusFilter('VALIDATED')}>
+                            <p className="text-2xl font-bold text-green-700">{stats.validated}</p>
+                            <p className="text-xs text-gray-500 mt-1">Valides</p>
+                        </Card>
+                        <Card className="text-center cursor-pointer" onClick={() => setStatusFilter('REJECTED')}>
+                            <p className="text-2xl font-bold text-red-700">{stats.rejected}</p>
+                            <p className="text-xs text-gray-500 mt-1">Refuses</p>
+                        </Card>
+                        <Card className="text-center cursor-pointer" onClick={() => setStatusFilter('PENDING_REVIEW')}>
+                            <p className="text-2xl font-bold text-amber-700">{stats.pending}</p>
+                            <p className="text-xs text-gray-500 mt-1">En attente</p>
+                        </Card>
+                    </div>
+
+                    <Card>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-semibold text-gray-900">Verifications recues ({filtered.length})</h3>
+                            <Select value={statusFilter} onChange={setStatusFilter} options={[
+                                { value: '', label: 'Tous les statuts' },
+                                { value: 'VALIDATED', label: 'Valides' },
+                                { value: 'REJECTED', label: 'Refuses' },
+                                { value: 'PENDING_REVIEW', label: 'En attente' }
+                            ]} />
+                        </div>
+                        {filtered.length === 0 ? (
+                            <div className="text-center py-12 text-gray-400">
+                                <Icons.Camera />
+                                <p className="mt-3 text-sm">Aucune preuve de vie recue</p>
+                                <p className="text-xs text-gray-400 mt-1">Les verifications apparaitront ici lorsque les retraites effectueront leur preuve de vie via WhatsApp.</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-gray-100">
+                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Retraite</th>
+                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Matricule</th>
+                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Telephone</th>
+                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Statut</th>
+                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Similarite</th>
+                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Date</th>
+                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Appareil</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filtered.map(r => (
+                                            <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50">
+                                                <td className="py-3 px-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">
+                                                            {(r.name || '??').split(' ').slice(0,2).map(n => n[0]).join('')}
+                                                        </div>
+                                                        <span className="font-medium text-gray-900">{r.name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-3 text-gray-600 font-mono text-xs">{r.matricule || '—'}</td>
+                                                <td className="py-3 px-3 text-gray-600">{r.phone}</td>
+                                                <td className="py-3 px-3">
+                                                    <Badge variant={statusVariant[r.status] || 'default'}>{statusMap[r.status] || r.status}</Badge>
+                                                </td>
+                                                <td className="py-3 px-3">
+                                                    {r.similarity != null ? (
+                                                        <span className={`font-semibold ${r.similarity >= 75 ? 'text-green-600' : r.similarity >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                                                            {typeof r.similarity === 'number' ? r.similarity.toFixed(1) : r.similarity}%
+                                                        </span>
+                                                    ) : '—'}
+                                                </td>
+                                                <td className="py-3 px-3 text-gray-500 text-xs">{r.date ? new Date(r.date).toLocaleString('fr-FR') : '—'}</td>
+                                                <td className="py-3 px-3 text-gray-400 text-xs">{r.device || '—'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </Card>
+                </div>
+            );
+        };
+
         // Analytics View
         // =============================================
         const AnalyticsView = () => {
