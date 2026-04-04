@@ -592,15 +592,27 @@ let retireeData = null;
 // ═══════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   // Extraire les paramètres URL
-  // Format attendu: ?nom=NDONG+OBAME+Jean&matricule=CPF-2024-00145&photo_ref=https://...
-  const params = new URLSearchParams(window.location.search);
-  
+  // Format 1 (direct): ?nom=X&matricule=Y&photo_ref=Z&token=W
+  // Format 2 (template Meta): ?data=nom%3DX%26matricule%3DY%26photo_ref%3DZ%26token%3DW
+  let params = new URLSearchParams(window.location.search);
+
+  // Si le param 'data' existe, c'est le format template Meta — re-parser
+  if (params.get('data')) {
+    params = new URLSearchParams(params.get('data'));
+  }
+
   retireeData = {
-    nom: params.get('nom') || 'NDONG OBAME Jean-Pierre',
-    matricule: params.get('matricule') || 'CPF-2024-00145',
+    nom: params.get('nom') || '',
+    matricule: params.get('matricule') || '',
     photo_ref: params.get('photo_ref') || '',
     token: params.get('token') || '',
   };
+
+  // Si pas de nom, afficher un message d'erreur
+  if (!retireeData.nom) {
+    retireeData.nom = 'Assure CPPF';
+    retireeData.matricule = '---';
+  }
 
   // Affichage des infos
   document.getElementById('userName').textContent = retireeData.nom;
@@ -721,12 +733,14 @@ async function submitPhoto() {
       const selfieForm = new FormData();
       selfieForm.append('file', capturedBlob, 'selfie.jpg');
       selfieForm.append('type', 'selfie');
-      if (retireeData.matricule) {
-        // Trouver le contactId via matricule
+      // Trouver le contactId — via token (contactId direct) ou matricule
+      let contactId = retireeData.token || '';
+      if (!contactId && retireeData.matricule) {
         const contactResp = await fetch(window.location.origin + '/api/preuve-de-vie/find-contact?matricule=' + encodeURIComponent(retireeData.matricule));
         const contactData = await contactResp.json();
-        if (contactData.contactId) selfieForm.append('contactId', contactData.contactId);
+        contactId = contactData.contactId || '';
       }
+      if (contactId) selfieForm.append('contactId', contactId);
       const uploadResp = await fetch(window.location.origin + '/api/preuve-de-vie/upload-photo', { method: 'POST', body: selfieForm });
       const uploadResult = await uploadResp.json();
       if (uploadResult.url) selfieUrl = uploadResult.url;
