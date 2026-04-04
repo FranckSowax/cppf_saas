@@ -3794,6 +3794,54 @@
             const [uploadingRef, setUploadingRef] = useState(null);
             const [uploadingSelfie, setUploadingSelfie] = useState(null);
 
+            const [showNewModal, setShowNewModal] = useState(false);
+            const [contacts, setContacts] = useState([]);
+            const [newContactId, setNewContactId] = useState('');
+            const [sendingLink, setSendingLink] = useState(false);
+            const [newRefUploading, setNewRefUploading] = useState(false);
+            const [newRefUrl, setNewRefUrl] = useState('');
+
+            const loadContacts = async () => {
+                try {
+                    const resp = await api('/contacts?limit=100&category=RETRAITE');
+                    setContacts(resp?.data || []);
+                } catch { setContacts([]); }
+            };
+
+            const handleOpenNew = () => { loadContacts(); setShowNewModal(true); setNewContactId(''); setNewRefUrl(''); };
+
+            const handleNewRefUpload = async (file) => {
+                if (!file || !newContactId) return;
+                setNewRefUploading(true);
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('contactId', newContactId);
+                    formData.append('type', 'reference');
+                    const token = authStore.getToken();
+                    const resp = await fetch('/api/preuve-de-vie/upload-photo', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
+                    const result = await resp.json();
+                    if (result.url) setNewRefUrl(result.url);
+                } catch (err) { alert(err.message); }
+                setNewRefUploading(false);
+            };
+
+            const handleSendLink = async () => {
+                if (!newContactId) return;
+                setSendingLink(true);
+                try {
+                    const result = await api('/preuve-de-vie/send-link', { method: 'POST', body: JSON.stringify({ contactId: newContactId }) });
+                    if (result.success) {
+                        alert('Lien envoye par WhatsApp !');
+                        setShowNewModal(false);
+                        refetch();
+                    } else {
+                        alert('Erreur: ' + (result.error || 'Envoi echoue'));
+                    }
+                } catch (err) { alert(err.message); }
+                setSendingLink(false);
+            };
+
             const handleSeedDemo = async () => {
                 setSeeding(true);
                 try {
@@ -3859,7 +3907,7 @@
                         </div>
                         <div className="flex gap-2">
                             <Button variant="outline" onClick={handleSeedDemo} disabled={seeding}>{seeding ? 'Chargement...' : 'Donnees demo'}</Button>
-                            <Button icon={Icons.Download} onClick={refetch}>Actualiser</Button>
+                            <Button icon={Icons.Plus} onClick={handleOpenNew}>Nouvelle verification</Button>
                         </div>
                     </div>
 
@@ -3881,6 +3929,58 @@
                             <p className="text-xs text-amber-600 mt-1">En attente</p>
                         </Card>
                     </div>
+
+                    {/* Modal nouvelle verification */}
+                    {showNewModal && (
+                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowNewModal(false)}>
+                            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={e => e.stopPropagation()}>
+                                <div className="p-6 border-b border-gray-100">
+                                    <h3 className="text-lg font-bold text-gray-900">Nouvelle verification</h3>
+                                    <p className="text-sm text-gray-500">Selectionnez un retraite, ajoutez sa photo de reference, puis envoyez le lien</p>
+                                </div>
+                                <div className="p-6 space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Retraite</label>
+                                        <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={newContactId} onChange={e => { setNewContactId(e.target.value); setNewRefUrl(''); }}>
+                                            <option value="">Selectionner un retraite...</option>
+                                            {contacts.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name} — {c.matricule || c.phone}</option>
+                                            ))}
+                                        </select>
+                                        {contacts.length === 0 && <p className="text-xs text-gray-400 mt-1">Aucun contact de categorie RETRAITE. Creez-en un d'abord dans Contacts.</p>}
+                                    </div>
+
+                                    {newContactId && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Photo de reference (biometrique)</label>
+                                            {newRefUrl ? (
+                                                <div className="flex items-center gap-3">
+                                                    <img src={newRefUrl} alt="Ref" className="w-16 h-20 rounded-lg object-cover border" />
+                                                    <span className="text-sm text-green-600 font-medium">Photo uploadee</span>
+                                                </div>
+                                            ) : (
+                                                <label className="flex items-center justify-center gap-2 w-full py-8 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                                                    <Icons.Upload />
+                                                    <span className="text-sm text-gray-500">{newRefUploading ? 'Upload en cours...' : 'Cliquez pour uploader la photo'}</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files[0] && handleNewRefUpload(e.target.files[0])} disabled={newRefUploading} />
+                                                </label>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {newContactId && (
+                                        <div className="pt-2 space-y-2">
+                                            <button className="w-full py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2" onClick={handleSendLink} disabled={sendingLink || !newRefUrl}>
+                                                <Icons.Send />
+                                                {sendingLink ? 'Envoi en cours...' : 'Envoyer le lien WhatsApp'}
+                                            </button>
+                                            {!newRefUrl && newContactId && <p className="text-xs text-amber-600 text-center">Uploadez d'abord la photo de reference avant d'envoyer le lien.</p>}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Modal comparaison photos */}
                     {selectedItem && (

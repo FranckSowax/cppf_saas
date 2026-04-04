@@ -199,6 +199,72 @@ app.get('/api/preuve-de-vie/list', async (req, res) => {
   }
 });
 
+// GET /api/preuve-de-vie/find-contact - Trouver un contact par matricule
+app.get('/api/preuve-de-vie/find-contact', async (req, res) => {
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    const { matricule } = req.query;
+    if (!matricule) return res.json({ contactId: null });
+
+    const contact = await prisma.contact.findFirst({ where: { matricule } });
+    await prisma.$disconnect();
+    res.json({ contactId: contact?.id || null, name: contact?.name || null });
+  } catch (err) {
+    res.json({ contactId: null });
+  }
+});
+
+// POST /api/preuve-de-vie/send-link - Envoyer le lien de verification WhatsApp a un contact
+app.post('/api/preuve-de-vie/send-link', async (req, res) => {
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    const whatsappService = require('./services/whatsapp');
+    const { contactId } = req.body;
+
+    if (!contactId) return res.status(400).json({ error: 'contactId requis' });
+
+    const contact = await prisma.contact.findUnique({ where: { id: contactId } });
+    if (!contact) {
+      await prisma.$disconnect();
+      return res.status(404).json({ error: 'Contact non trouve' });
+    }
+
+    const domain = process.env.RAILWAY_PUBLIC_DOMAIN || 'cppfsaas-production.up.railway.app';
+    const attrs = contact.customAttributes || {};
+    const photoRef = attrs.preuveDeVie?.photoRef || '';
+
+    const params = new URLSearchParams({
+      nom: contact.name || '',
+      matricule: contact.matricule || '',
+      photo_ref: photoRef,
+      token: contact.id
+    });
+
+    const link = `https://${domain}/preuve-de-vie?${params.toString()}`;
+
+    // Envoyer via WhatsApp (message simple avec lien)
+    const result = await whatsappService.sendMessage(contact.phone,
+      `Bonjour ${contact.name || 'cher assure'},\n\nVotre preuve de vie est a effectuer. Cliquez sur le lien ci-dessous pour verifier votre identite en quelques secondes :\n\n${link}\n\n— CPPF`
+    );
+
+    // Marquer comme en attente
+    if (!attrs.preuveDeVie) attrs.preuveDeVie = {};
+    attrs.preuveDeVie.status = attrs.preuveDeVie.status || 'PENDING_REVIEW';
+    attrs.preuveDeVie.mode = 'api';
+    attrs.preuveDeVie.linkSentAt = new Date().toISOString();
+    await prisma.contact.update({ where: { id: contactId }, data: { customAttributes: attrs } });
+
+    await prisma.$disconnect();
+    logger.info('Preuve de vie link sent', { contactId, phone: contact.phone });
+    res.json({ success: result.success, link, messageId: result.messageId });
+  } catch (err) {
+    logger.error('Send preuve de vie link error', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/preuve-de-vie/upload-photo - Upload photo de reference ou selfie vers Supabase
 app.post('/api/preuve-de-vie/upload-photo', async (req, res) => {
   try {

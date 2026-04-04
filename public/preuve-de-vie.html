@@ -715,21 +715,35 @@ async function submitPhoto() {
   document.getElementById('cameraStepLabel').textContent = 'Étape 3 — Analyse en cours...';
 
   try {
-    // ─── Préparer le FormData ───
+    // ─── 1. Sauvegarder le selfie sur le backend CPPF ───
+    let selfieUrl = null;
+    try {
+      const selfieForm = new FormData();
+      selfieForm.append('file', capturedBlob, 'selfie.jpg');
+      selfieForm.append('type', 'selfie');
+      if (retireeData.matricule) {
+        // Trouver le contactId via matricule
+        const contactResp = await fetch(window.location.origin + '/api/preuve-de-vie/find-contact?matricule=' + encodeURIComponent(retireeData.matricule));
+        const contactData = await contactResp.json();
+        if (contactData.contactId) selfieForm.append('contactId', contactData.contactId);
+      }
+      const uploadResp = await fetch(window.location.origin + '/api/preuve-de-vie/upload-photo', { method: 'POST', body: selfieForm });
+      const uploadResult = await uploadResp.json();
+      if (uploadResult.url) selfieUrl = uploadResult.url;
+      console.log('Selfie uploaded:', uploadResult);
+    } catch (uploadErr) {
+      console.warn('Selfie upload failed (non-blocking):', uploadErr);
+    }
+
+    // ─── 2. Appel API FaceAnalyzer si photo_ref disponible ───
     const formData = new FormData();
-    
-    // Source = photo de référence CPPF (URL depuis la base de données)
-    // Target = selfie capturé par le retraité
     if (retireeData.photo_ref) {
       formData.append('source_image_url', retireeData.photo_ref);
     } else {
-      // Mode démo : utiliser une image test
       formData.append('source_image_url', 'https://openmediadata.s3.eu-west-3.amazonaws.com/face.jpg');
     }
-    
     formData.append('target_image', capturedBlob, 'selfie.jpg');
 
-    // ─── Appel API FaceAnalyzer ───
     const response = await fetch(CONFIG.COMPARE_URL, {
       method: 'POST',
       headers: {
@@ -740,9 +754,10 @@ async function submitPhoto() {
     });
 
     const data = await response.json();
+    data._selfieUrl = selfieUrl;
     console.log('API Response:', data);
 
-    // ─── Traiter le résultat ───
+    // ─── 3. Traiter le résultat ───
     processResult(data);
 
   } catch (error) {
