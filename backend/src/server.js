@@ -98,7 +98,12 @@ app.use('/api/webhooks', webhookRoutes);
 // Preuve de vie: servir la page et recevoir les resultats
 // ============================================
 app.get('/preuve-de-vie', (req, res) => {
-  res.sendFile(path.join(rootDir, 'public', 'preuve-de-vie.html'));
+  // Si query params present (lien WhatsApp), servir la page de verification
+  // Sinon (rafraichissement SPA), servir l'app principale
+  if (req.query.data || req.query.nom || req.query.token) {
+    return res.sendFile(path.join(rootDir, 'public', 'preuve-de-vie.html'));
+  }
+  res.sendFile(path.join(rootDir, 'index.html'));
 });
 
 app.post('/api/preuve-de-vie/result', async (req, res) => {
