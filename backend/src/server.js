@@ -326,7 +326,7 @@ app.post('/api/preuve-de-vie/upload-photo', async (req, res) => {
             attrs.preuveDeVie.photoSelfie = publicUrl;
             attrs.preuveDeVie.date = new Date().toISOString();
             attrs.preuveDeVie.status = attrs.preuveDeVie.status || 'PENDING_REVIEW';
-            attrs.preuveDeVie.mode = 'manual';
+            attrs.preuveDeVie.mode = req.body.compare === 'true' ? 'api' : 'manual';
           }
           await prisma.contact.update({ where: { id: contactId }, data: { customAttributes: attrs } });
         }
@@ -334,7 +334,68 @@ app.post('/api/preuve-de-vie/upload-photo', async (req, res) => {
       }
 
       logger.info('Preuve de vie photo uploaded', { type, contactId, path: storagePath });
-      res.json({ success: true, url: publicUrl, path: storagePath });
+
+      // Si compare=true et photo_ref fourni, faire la comparaison FaceAnalyzer cote serveur
+      let comparison = null;
+      if (req.body.compare === 'true' && req.body.photo_ref && type === 'selfie') {
+        try {
+          const axios = require('axios');
+          const FormData = require('form-data');
+          const formData = new FormData();
+          formData.append('source_image_url', req.body.photo_ref);
+          formData.append('target_image', req.file.buffer, { filename: 'selfie.jpg', contentType: 'image/jpeg' });
+
+          const apiResp = await axios.post('https://faceanalyzer-ai.p.rapidapi.com/compare-faces', formData, {
+            headers: {
+              ...formData.getHeaders(),
+              'x-rapidapi-key': '71062435d0mshd94e40817d37670p12b543jsn532d6e690964',
+              'x-rapidapi-host': 'faceanalyzer-ai.p.rapidapi.com',
+            },
+            timeout: 30000,
+          });
+
+          comparison = apiResp.data;
+          logger.info('FaceAnalyzer comparison done', { statusCode: comparison.statusCode, matched: comparison.body?.matchedFaces?.length || 0 });
+
+          // Mettre a jour le statut du contact selon le resultat
+          if (contactId && comparison.statusCode === 200) {
+            const { PrismaClient } = require('@prisma/client');
+            const prisma2 = new PrismaClient();
+            const contact2 = await prisma2.contact.findUnique({ where: { id: contactId } });
+            if (contact2) {
+              const attrs2 = contact2.customAttributes || {};
+              const hasMatch = comparison.body?.matchedFaces?.length > 0;
+              const hasUnmatch = comparison.body?.unmatchedFaces?.length > 0;
+              const similarity = hasMatch ? comparison.body.matchedFaces[0]?.similarity : (hasUnmatch ? comparison.body.unmatchedFaces[0]?.similarity : null);
+
+              attrs2.preuveDeVie = {
+                ...attrs2.preuveDeVie,
+                status: hasMatch ? 'VALIDATED' : hasUnmatch ? 'REJECTED' : 'PENDING_REVIEW',
+                similarity,
+                mode: 'api',
+              };
+
+              const updateData = { customAttributes: attrs2 };
+              if (hasMatch) updateData.dernierCertificatVie = new Date();
+
+              await prisma2.contact.update({ where: { id: contactId }, data: updateData });
+
+              // Envoyer confirmation WhatsApp si valide
+              if (hasMatch && contact2.phone) {
+                const whatsappService = require('./services/whatsapp');
+                await whatsappService.sendMessage(contact2.phone,
+                  `Votre preuve de vie a ete validee avec succes le ${new Date().toLocaleDateString('fr-FR')}. Aucune action supplementaire n'est requise. — CPPF`
+                );
+              }
+            }
+            await prisma2.$disconnect();
+          }
+        } catch (apiErr) {
+          logger.warn('FaceAnalyzer API error (non-blocking)', { error: apiErr.message });
+        }
+      }
+
+      res.json({ success: true, url: publicUrl, path: storagePath, comparison: comparison || null });
     });
   } catch (err) {
     logger.error('Photo upload error', { error: err.message });

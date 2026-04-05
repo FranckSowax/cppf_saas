@@ -693,12 +693,13 @@ async function submitPhoto() {
   document.getElementById('btnRetake').disabled = true;
   document.getElementById('cameraStepLabel').textContent = 'Etape 3 — Analyse en cours...';
 
-  // ── Etape 1 : TOUJOURS uploader le selfie au backend ──
-  let selfieUploaded = false;
+  // Upload selfie + comparaison cote backend (evite les problemes CORS navigateur mobile)
   try {
     const selfieForm = new FormData();
     selfieForm.append('file', capturedBlob, 'selfie.jpg');
     selfieForm.append('type', 'selfie');
+    selfieForm.append('compare', 'true');
+    selfieForm.append('photo_ref', retireeData.photo_ref || '');
     let contactId = retireeData.token || '';
     if (!contactId && retireeData.matricule) {
       const r = await fetch(window.location.origin + '/api/preuve-de-vie/find-contact?matricule=' + encodeURIComponent(retireeData.matricule));
@@ -706,47 +707,33 @@ async function submitPhoto() {
       contactId = d.contactId || '';
     }
     if (contactId) selfieForm.append('contactId', contactId);
-    const ur = await fetch(window.location.origin + '/api/preuve-de-vie/upload-photo', { method: 'POST', body: selfieForm });
-    const ures = await ur.json();
-    selfieUploaded = !!ures.url;
-    console.log('Selfie uploaded:', ures);
-  } catch (e) { console.warn('Selfie upload error:', e); }
+    selfieForm.append('matricule', retireeData.matricule || '');
+    selfieForm.append('nom', retireeData.nom || '');
+    selfieForm.append('token', retireeData.token || '');
 
-  // ── Etape 2 : Tenter la comparaison API (optionnelle) ──
-  let apiResult = null;
-  try {
-    if (retireeData.photo_ref) {
-      const formData = new FormData();
-      formData.append('source_image_url', retireeData.photo_ref);
-      formData.append('target_image', capturedBlob, 'selfie.jpg');
-      const response = await fetch(CONFIG.COMPARE_URL, {
-        method: 'POST',
-        headers: { 'x-rapidapi-key': CONFIG.RAPIDAPI_KEY, 'x-rapidapi-host': CONFIG.RAPIDAPI_HOST },
-        body: formData,
+    const resp = await fetch(window.location.origin + '/api/preuve-de-vie/upload-photo', { method: 'POST', body: selfieForm });
+    const result = await resp.json();
+    console.log('Backend result:', result);
+
+    if (result.comparison) {
+      // Backend a fait la comparaison API
+      processResult(result.comparison);
+    } else if (result.url) {
+      // Selfie uploade mais pas de comparaison (pas de photo_ref)
+      showResult('warning', {
+        title: 'Photo envoyee',
+        message: 'Votre photo a bien ete transmise a la CPPF. Un agent verifiera votre identite sous 24h.',
+        timestamp: new Date().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        matricule: retireeData.matricule,
       });
-      apiResult = await response.json();
-      console.log('FaceAnalyzer result:', apiResult);
+      notifyCPPFBackend('PENDING_REVIEW', {});
+      updateStep(3);
+    } else {
+      throw new Error(result.error || 'Upload echoue');
     }
-  } catch (apiErr) {
-    console.warn('FaceAnalyzer API error (non-blocking):', apiErr);
-  }
-
-  // ── Etape 3 : Traiter le resultat ──
-  if (apiResult && apiResult.statusCode === 200) {
-    // API a repondu — traiter le resultat
-    processResult(apiResult);
-  } else {
-    // API indisponible ou pas de photo de reference → verification manuelle
-    showResult('warning', {
-      title: 'Photo envoyee',
-      message: selfieUploaded
-        ? 'Votre photo a bien ete transmise a la CPPF. Un agent verifiera votre identite sous 24h.'
-        : 'La transmission a rencontre un probleme. Veuillez reessayer.',
-      timestamp: new Date().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      matricule: retireeData.matricule,
-    });
-    notifyCPPFBackend('PENDING_REVIEW', apiResult || {});
-    updateStep(3);
+  } catch (err) {
+    console.error('Error:', err);
+    showResult('warning', { title: 'Erreur', message: 'La transmission a rencontre un probleme. Veuillez reessayer.' });
   }
 
   document.getElementById('loadingOverlay').classList.add('hidden');
