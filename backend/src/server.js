@@ -112,44 +112,51 @@ app.post('/api/preuve-de-vie/result', async (req, res) => {
     const prisma = new PrismaClient();
     const { matricule, nom, status, timestamp, token, similarity, device_info } = req.body;
 
-    logger.info('Preuve de vie result received', { matricule, nom, status, similarity });
+    logger.info('Preuve de vie result received', { matricule, nom, status, similarity, token });
 
-    // Stocker le resultat dans la table contact (champ customAttributes)
-    if (matricule) {
-      const contact = await prisma.contact.findFirst({
-        where: { OR: [{ matricule }, { name: { contains: nom?.split(' ')[0] || '', mode: 'insensitive' } }] }
+    // Trouver le contact par token (contactId), matricule, ou nom
+    const findWhere = [];
+    if (token) findWhere.push({ id: token });
+    if (matricule) findWhere.push({ matricule });
+    if (nom && nom.split(' ')[0]) findWhere.push({ name: { contains: nom.split(' ')[0], mode: 'insensitive' } });
+
+    let contact = null;
+    if (findWhere.length > 0) {
+      contact = await prisma.contact.findFirst({ where: { OR: findWhere } });
+    }
+
+    if (contact) {
+      const attrs = contact.customAttributes || {};
+      // MERGER avec les donnees existantes (photoRef, photoSelfie) au lieu d'ecraser
+      const existing = attrs.preuveDeVie || {};
+      attrs.preuveDeVie = {
+        ...existing,
+        status,
+        date: timestamp || new Date().toISOString(),
+        similarity,
+        device: device_info?.platform || existing.device || 'unknown',
+        mode: existing.mode || 'api'
+      };
+
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          customAttributes: attrs,
+          dernierCertificatVie: status === 'VALIDATED' ? new Date() : contact.dernierCertificatVie
+        }
       });
 
-      if (contact) {
-        const attrs = contact.customAttributes || {};
-        attrs.preuveDeVie = {
-          status,
-          date: timestamp || new Date().toISOString(),
-          similarity,
-          device: device_info?.platform || 'unknown'
-        };
-
-        await prisma.contact.update({
-          where: { id: contact.id },
-          data: {
-            customAttributes: attrs,
-            dernierCertificatVie: status === 'VALIDATED' ? new Date() : contact.dernierCertificatVie
-          }
-        });
-
-        logger.info('Preuve de vie saved for contact', { contactId: contact.id, status });
-      }
+      logger.info('Preuve de vie saved for contact', { contactId: contact.id, status });
+    } else {
+      logger.warn('Preuve de vie: contact not found', { token, matricule, nom });
     }
 
     // Envoyer une confirmation WhatsApp au retraite
-    if (status === 'VALIDATED' && matricule) {
-      const contact = await prisma.contact.findFirst({ where: { matricule } });
-      if (contact?.phone) {
-        const whatsappService = require('./services/whatsapp');
-        await whatsappService.sendMessage(contact.phone,
-          `Votre preuve de vie a ete validee avec succes le ${new Date().toLocaleDateString('fr-FR')}. Aucune action supplementaire n'est requise. — CPPF`
-        );
-      }
+    if (status === 'VALIDATED' && contact?.phone) {
+      const whatsappService = require('./services/whatsapp');
+      await whatsappService.sendMessage(contact.phone,
+        `Votre preuve de vie a ete validee avec succes le ${new Date().toLocaleDateString('fr-FR')}. Aucune action supplementaire n'est requise. — CPPF`
+      );
     }
 
     await prisma.$disconnect();
