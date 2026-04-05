@@ -186,22 +186,28 @@ app.get('/api/preuve-de-vie/list', async (req, res) => {
     // Filtrer ceux qui ont effectivement une preuveDeVie
     const results = contacts
       .filter(c => c.customAttributes?.preuveDeVie)
-      .map(c => ({
-        id: c.id,
-        name: c.name,
-        phone: c.phone,
-        matricule: c.matricule,
-        category: c.category,
-        status: c.customAttributes.preuveDeVie.status,
-        mode: c.customAttributes.preuveDeVie.mode || 'api',
-        date: c.customAttributes.preuveDeVie.date,
-        similarity: c.customAttributes.preuveDeVie.similarity,
-        device: c.customAttributes.preuveDeVie.device,
-        photoRef: c.customAttributes.preuveDeVie.photoRef || null,
-        photoSelfie: c.customAttributes.preuveDeVie.photoSelfie || null,
-        validatedBy: c.customAttributes.preuveDeVie.validatedBy || null,
-        dernierCertificatVie: c.dernierCertificatVie
-      }));
+      .map(c => {
+        const pdv = c.customAttributes.preuveDeVie;
+        const history = Array.isArray(pdv.history) ? pdv.history : [];
+        return {
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          matricule: c.matricule,
+          category: c.category,
+          status: pdv.status,
+          mode: pdv.mode || 'api',
+          date: pdv.date,
+          similarity: pdv.similarity,
+          device: pdv.device,
+          photoRef: pdv.photoRef || null,
+          photoSelfie: pdv.photoSelfie || null,
+          validatedBy: pdv.validatedBy || null,
+          dernierCertificatVie: c.dernierCertificatVie,
+          historyCount: history.length,
+          history: history.sort((a, b) => new Date(b.date) - new Date(a.date))
+        };
+      });
 
     await prisma.$disconnect();
     res.json({ data: results, total: results.length });
@@ -320,12 +326,35 @@ app.post('/api/preuve-de-vie/upload-photo', async (req, res) => {
         if (contact) {
           const attrs = contact.customAttributes || {};
           if (!attrs.preuveDeVie) attrs.preuveDeVie = {};
+          if (!Array.isArray(attrs.preuveDeVie.history)) attrs.preuveDeVie.history = [];
+
           if (type === 'reference') {
             attrs.preuveDeVie.photoRef = publicUrl;
           } else {
+            // Archiver la verification precedente dans l'historique (si elle existe et a un selfie)
+            if (attrs.preuveDeVie.photoSelfie && attrs.preuveDeVie.date) {
+              const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+              const lastMonth = attrs.preuveDeVie.date.slice(0, 7);
+              // Ajouter a l'historique si pas deja le meme mois
+              const alreadyInHistory = attrs.preuveDeVie.history.some(h => h.date?.slice(0, 7) === lastMonth && h.photoSelfie === attrs.preuveDeVie.photoSelfie);
+              if (!alreadyInHistory) {
+                attrs.preuveDeVie.history.push({
+                  date: attrs.preuveDeVie.date,
+                  photoSelfie: attrs.preuveDeVie.photoSelfie,
+                  status: attrs.preuveDeVie.status,
+                  similarity: attrs.preuveDeVie.similarity,
+                  mode: attrs.preuveDeVie.mode,
+                  validatedBy: attrs.preuveDeVie.validatedBy || null,
+                  device: attrs.preuveDeVie.device || null
+                });
+              }
+            }
+            // Mettre a jour la verification courante
             attrs.preuveDeVie.photoSelfie = publicUrl;
             attrs.preuveDeVie.date = new Date().toISOString();
-            attrs.preuveDeVie.status = attrs.preuveDeVie.status || 'PENDING_REVIEW';
+            attrs.preuveDeVie.status = 'PENDING_REVIEW';
+            attrs.preuveDeVie.similarity = null;
+            attrs.preuveDeVie.validatedBy = null;
             attrs.preuveDeVie.mode = req.body.compare === 'true' ? 'api' : 'manual';
           }
           await prisma.contact.update({ where: { id: contactId }, data: { customAttributes: attrs } });
@@ -470,6 +499,23 @@ app.post('/api/preuve-de-vie/seed-demo', async (req, res) => {
         const attrs = contact.customAttributes || {};
         const date = new Date();
         date.setDate(date.getDate() - demo.daysAgo);
+        // Generer un historique de 3 mois precedents pour les contacts valides
+        const history = [];
+        if (demo.status === 'VALIDATED') {
+          for (let m = 1; m <= 3; m++) {
+            const hDate = new Date();
+            hDate.setMonth(hDate.getMonth() - m);
+            history.push({
+              date: hDate.toISOString(),
+              photoSelfie: 'https://openmediadata.s3.eu-west-3.amazonaws.com/face.jpg',
+              status: 'VALIDATED',
+              similarity: 85 + Math.random() * 10,
+              mode: m % 2 === 0 ? 'manual' : 'api',
+              validatedBy: m % 2 === 0 ? 'Agent CPPF' : null,
+              device: demo.device
+            });
+          }
+        }
         attrs.preuveDeVie = {
           status: demo.status,
           mode: demo.mode,
@@ -478,7 +524,8 @@ app.post('/api/preuve-de-vie/seed-demo', async (req, res) => {
           device: demo.device,
           photoRef: 'https://openmediadata.s3.eu-west-3.amazonaws.com/face.jpg',
           photoSelfie: demo.status !== 'PENDING_REVIEW' ? 'https://openmediadata.s3.eu-west-3.amazonaws.com/face.jpg' : null,
-          validatedBy: demo.mode === 'manual' ? null : undefined
+          validatedBy: demo.mode === 'manual' ? null : undefined,
+          history
         };
         const updateData = { customAttributes: attrs };
         if (demo.status === 'VALIDATED') updateData.dernierCertificatVie = date;

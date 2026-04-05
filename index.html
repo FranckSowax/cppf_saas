@@ -4057,6 +4057,38 @@
                                             <button className="px-6 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50" onClick={() => setSelectedItem(null)}>Fermer</button>
                                         </div>
                                     )}
+
+                                    {/* Historique mensuel */}
+                                    {selectedItem.history && selectedItem.history.length > 0 && (
+                                        <div className="mt-6 pt-6 border-t border-gray-100">
+                                            <h4 className="text-sm font-bold text-gray-700 mb-3">Historique des verifications ({selectedItem.history.length})</h4>
+                                            <div className="space-y-3 max-h-64 overflow-y-auto">
+                                                {selectedItem.history.map((h, i) => (
+                                                    <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                                                        {h.photoSelfie ? (
+                                                            <img src={h.photoSelfie} alt="Selfie" className="w-12 h-12 rounded-lg object-cover border" />
+                                                        ) : (
+                                                            <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center text-gray-400 text-xs">?</div>
+                                                        )}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-xs font-semibold text-gray-700">{h.date ? new Date(h.date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : '—'}</span>
+                                                                <Badge variant={statusVariant[h.status] || 'default'}>{statusMap[h.status] || h.status}</Badge>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                {h.similarity != null && (
+                                                                    <span className={`text-xs font-semibold ${h.similarity >= 75 ? 'text-green-600' : 'text-amber-600'}`}>{h.similarity.toFixed(1)}%</span>
+                                                                )}
+                                                                <span className={`text-xs px-1.5 py-0.5 rounded ${h.mode === 'api' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>{h.mode === 'api' ? 'IA' : 'Manuel'}</span>
+                                                                {h.validatedBy && <span className="text-xs text-gray-400">{h.validatedBy}</span>}
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-xs text-gray-400 flex-shrink-0">{h.date ? new Date(h.date).toLocaleDateString('fr-FR') : ''}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -4089,6 +4121,7 @@
                                             <th className="text-left py-3 px-3 font-medium text-gray-500">Statut</th>
                                             <th className="text-left py-3 px-3 font-medium text-gray-500">Similarite</th>
                                             <th className="text-left py-3 px-3 font-medium text-gray-500">Date</th>
+                                            <th className="text-left py-3 px-3 font-medium text-gray-500">Historique</th>
                                             <th className="text-left py-3 px-3 font-medium text-gray-500">Action</th>
                                         </tr>
                                     </thead>
@@ -4123,6 +4156,13 @@
                                                     ) : '—'}
                                                 </td>
                                                 <td className="py-3 px-3 text-gray-500 text-xs">{r.date ? new Date(r.date).toLocaleString('fr-FR') : '—'}</td>
+                                                <td className="py-3 px-3">
+                                                    {r.historyCount > 0 ? (
+                                                        <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{r.historyCount} mois</span>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-300">1er</span>
+                                                    )}
+                                                </td>
                                                 <td className="py-3 px-3">
                                                     {r.status === 'PENDING_REVIEW' ? (
                                                         <span className="text-xs text-amber-600 font-semibold">A verifier</span>
