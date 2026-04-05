@@ -236,12 +236,13 @@ app.post('/api/preuve-de-vie/send-link', async (req, res) => {
     const photoRef = attrs.preuveDeVie?.photoRef || '';
 
     // Construire les parametres URL pour le bouton dynamique
-    const urlParams = new URLSearchParams({
+    // encodeURIComponent pour que les & restent dans la valeur de data= et ne soient pas des separateurs
+    const urlParams = encodeURIComponent(new URLSearchParams({
       nom: contact.name || '',
       matricule: contact.matricule || '',
       photo_ref: photoRef,
       token: contact.id
-    }).toString();
+    }).toString());
 
     // Envoyer via le template APPROVED cppf_preuve_de_vie (UTILITY)
     // Le template a: HEADER TEXT, BODY avec {{1}}=nom, BUTTON URL avec {{1}}=data params

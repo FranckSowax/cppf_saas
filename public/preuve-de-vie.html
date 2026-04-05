@@ -596,13 +596,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Format 2 (template Meta): ?data=nom%3DX%26matricule%3DY%26photo_ref%3DZ%26token%3DW
   let params = new URLSearchParams(window.location.search);
 
-  // Si le param 'data' existe, c'est le format template Meta — re-parser
+  // Si le param 'data' existe, c'est le format template Meta — decoder et re-parser
   if (params.get('data')) {
-    params = new URLSearchParams(params.get('data'));
+    const dataValue = decodeURIComponent(params.get('data'));
+    params = new URLSearchParams(dataValue);
   }
 
   retireeData = {
-    nom: params.get('nom') || '',
+    nom: params.get('nom') || params.get('data')?.split('nom=')[1]?.split('&')[0] || '',
     matricule: params.get('matricule') || '',
     photo_ref: params.get('photo_ref') || '',
     token: params.get('token') || '',
