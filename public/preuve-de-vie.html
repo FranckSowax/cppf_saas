@@ -747,8 +747,10 @@ function processResult(data) {
     updateStep(3);
     return;
   }
-  const hasMatch = data.matchedFaces && data.matchedFaces.length > 0;
-  const hasUnmatched = data.unmatchedFaces && data.unmatchedFaces.length > 0;
+  // L'API retourne { statusCode, body: { matchedFaces, unmatchedFaces } }
+  const body = data.body || data;
+  const hasMatch = body.matchedFaces && body.matchedFaces.length > 0;
+  const hasUnmatched = body.unmatchedFaces && body.unmatchedFaces.length > 0;
   if (hasMatch) {
     showResult('success', { title: 'Identite confirmee', message: 'Votre preuve de vie a ete validee avec succes. Aucune action supplementaire requise.', timestamp, matricule: retireeData.matricule });
     notifyCPPFBackend('VALIDATED', data);
@@ -791,7 +793,7 @@ async function notifyCPPFBackend(status, apiResponse) {
     status,
     timestamp: new Date().toISOString(),
     token: retireeData.token,
-    similarity: apiResponse.matchedFaces?.[0]?.similarity || apiResponse.unmatchedFaces?.[0]?.similarity || null,
+    similarity: apiResponse.body?.matchedFaces?.[0]?.similarity || apiResponse.body?.unmatchedFaces?.[0]?.similarity || apiResponse.matchedFaces?.[0]?.similarity || apiResponse.unmatchedFaces?.[0]?.similarity || null,
     device_info: { userAgent: navigator.userAgent, platform: navigator.platform }
   };
   try {
