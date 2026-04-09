@@ -701,6 +701,7 @@ async function submitPhoto() {
   document.getElementById('btnSubmit').disabled = true;
   document.getElementById('btnRetake').disabled = true;
   document.getElementById('cameraStepLabel').textContent = 'Etape 3 — Analyse en cours...';
+  updateStep(3);
 
   // Upload selfie + comparaison cote backend (evite les problemes CORS navigateur mobile)
   try {
@@ -736,7 +737,7 @@ async function submitPhoto() {
         matricule: retireeData.matricule,
       });
       notifyCPPFBackend('PENDING_REVIEW', {});
-      updateStep(3);
+      updateStep(4);
     } else {
       throw new Error(result.error || 'Upload echoue');
     }
@@ -769,7 +770,7 @@ function processResult(data, backendAlreadyUpdated = false) {
     showResult('warning', { title: 'Photo envoyee', message: 'Votre photo a bien ete transmise. Un agent CPPF examinera votre dossier sous 24h.', timestamp, matricule: retireeData.matricule });
     if (!backendAlreadyUpdated) notifyCPPFBackend('PENDING_REVIEW', data);
   }
-  updateStep(3);
+  updateStep(4); // 4 = toutes les etapes terminees (3 coches vertes)
 }
 
 function showResult(type, info) {
