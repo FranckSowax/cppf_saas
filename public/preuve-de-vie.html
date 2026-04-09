@@ -723,9 +723,9 @@ async function submitPhoto() {
     const result = await resp.json();
     console.log('Backend result:', result);
 
-    if (result.comparison) {
-      // Backend a fait la comparaison API
-      processResult(result.comparison);
+    if (result.comparison && result.comparison.statusCode === 200) {
+      // Backend a fait la comparaison API — afficher le resultat (backend a deja mis a jour le statut)
+      processResult(result.comparison, true);
     } else if (result.url) {
       // Selfie uploade mais pas de comparaison (pas de photo_ref)
       showResult('warning', {
@@ -747,27 +747,26 @@ async function submitPhoto() {
   document.getElementById('loadingOverlay').classList.add('hidden');
 }
 
-function processResult(data) {
+function processResult(data, backendAlreadyUpdated = false) {
   const timestamp = new Date().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   if (data.statusCode !== 200) {
     showResult('warning', { title: 'Verification impossible', message: 'Aucun visage detecte. Reprenez la photo dans de meilleures conditions.', timestamp });
-    notifyCPPFBackend('PENDING_REVIEW', data);
+    if (!backendAlreadyUpdated) notifyCPPFBackend('PENDING_REVIEW', data);
     updateStep(3);
     return;
   }
-  // L'API retourne { statusCode, body: { matchedFaces, unmatchedFaces } }
   const body = data.body || data;
   const hasMatch = body.matchedFaces && body.matchedFaces.length > 0;
   const hasUnmatched = body.unmatchedFaces && body.unmatchedFaces.length > 0;
   if (hasMatch) {
     showResult('success', { title: 'Identite confirmee', message: 'Votre preuve de vie a ete validee avec succes. Aucune action supplementaire requise.', timestamp, matricule: retireeData.matricule });
-    notifyCPPFBackend('VALIDATED', data);
+    if (!backendAlreadyUpdated) notifyCPPFBackend('VALIDATED', data);
   } else if (hasUnmatched) {
     showResult('danger', { title: 'Identite non confirmee', message: 'Le visage ne correspond pas. Veuillez reessayer ou vous presenter en agence CPPF.', timestamp, matricule: retireeData.matricule });
-    notifyCPPFBackend('REJECTED', data);
+    if (!backendAlreadyUpdated) notifyCPPFBackend('REJECTED', data);
   } else {
-    showResult('warning', { title: 'Verification manuelle requise', message: 'Un agent CPPF examinera votre dossier sous 24h.', timestamp, matricule: retireeData.matricule });
-    notifyCPPFBackend('PENDING_REVIEW', data);
+    showResult('warning', { title: 'Photo envoyee', message: 'Votre photo a bien ete transmise. Un agent CPPF examinera votre dossier sous 24h.', timestamp, matricule: retireeData.matricule });
+    if (!backendAlreadyUpdated) notifyCPPFBackend('PENDING_REVIEW', data);
   }
   updateStep(3);
 }

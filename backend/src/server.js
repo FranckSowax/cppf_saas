@@ -378,14 +378,25 @@ app.post('/api/preuve-de-vie/upload-photo', async (req, res) => {
 
       logger.info('Preuve de vie photo uploaded', { type, contactId, path: storagePath });
 
-      // Si compare=true et photo_ref fourni, faire la comparaison FaceAnalyzer cote serveur
+      // Si compare=true, faire la comparaison FaceAnalyzer cote serveur
+      // Recuperer photo_ref depuis le body ou depuis le contact en DB
       let comparison = null;
-      if (req.body.compare === 'true' && req.body.photo_ref && type === 'selfie') {
+      let photoRefUrl = req.body.photo_ref || '';
+      if (!photoRefUrl && contactId) {
+        try {
+          const { PrismaClient } = require('@prisma/client');
+          const prismaRef = new PrismaClient();
+          const cRef = await prismaRef.contact.findUnique({ where: { id: contactId } });
+          photoRefUrl = cRef?.customAttributes?.preuveDeVie?.photoRef || '';
+          await prismaRef.$disconnect();
+        } catch (e) {}
+      }
+      if (req.body.compare === 'true' && photoRefUrl && type === 'selfie') {
         try {
           const axios = require('axios');
           const FormData = require('form-data');
           const formData = new FormData();
-          formData.append('source_image_url', req.body.photo_ref);
+          formData.append('source_image_url', photoRefUrl);
           formData.append('target_image', req.file.buffer, { filename: 'selfie.jpg', contentType: 'image/jpeg' });
 
           const apiResp = await axios.post('https://faceanalyzer-ai.p.rapidapi.com/compare-faces', formData, {
