@@ -626,6 +626,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const now = new Date();
   document.getElementById('dateToday').innerHTML =
     now.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) + '<br>' + now.getFullYear();
+
+  // Si pas de photo_ref dans l'URL, la recuperer via le token (contactId) depuis le backend
+  if (!retireeData.photo_ref && retireeData.token) {
+    fetch(window.location.origin + '/api/preuve-de-vie/contact-info?id=' + retireeData.token)
+      .then(r => r.json())
+      .then(d => { if (d.photoRef) retireeData.photo_ref = d.photoRef; })
+      .catch(() => {});
+  }
 });
 
 async function startCamera() {

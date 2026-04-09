@@ -217,6 +217,22 @@ app.get('/api/preuve-de-vie/list', async (req, res) => {
   }
 });
 
+// GET /api/preuve-de-vie/contact-info - Recuperer la photo_ref via contactId
+app.get('/api/preuve-de-vie/contact-info', async (req, res) => {
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    const { id } = req.query;
+    if (!id) return res.json({ photoRef: null });
+    const contact = await prisma.contact.findUnique({ where: { id } });
+    await prisma.$disconnect();
+    const photoRef = contact?.customAttributes?.preuveDeVie?.photoRef || null;
+    res.json({ photoRef, name: contact?.name || null, matricule: contact?.matricule || null });
+  } catch (err) {
+    res.json({ photoRef: null });
+  }
+});
+
 // GET /api/preuve-de-vie/find-contact - Trouver un contact par matricule
 app.get('/api/preuve-de-vie/find-contact', async (req, res) => {
   try {
@@ -249,16 +265,14 @@ app.post('/api/preuve-de-vie/send-link', async (req, res) => {
       return res.status(404).json({ error: 'Contact non trouve' });
     }
 
-    const domain = process.env.RAILWAY_PUBLIC_DOMAIN || 'cppfsaas-production.up.railway.app';
     const attrs = contact.customAttributes || {};
-    const photoRef = attrs.preuveDeVie?.photoRef || '';
 
     // Construire les parametres URL pour le bouton dynamique
-    // encodeURIComponent pour que les & restent dans la valeur de data= et ne soient pas des separateurs
+    // Ne PAS inclure photo_ref dans l'URL (trop long, casse le lien)
+    // Le backend retrouve la photo_ref via le token (contactId)
     const urlParams = encodeURIComponent(new URLSearchParams({
       nom: contact.name || '',
       matricule: contact.matricule || '',
-      photo_ref: photoRef,
       token: contact.id
     }).toString());
 
